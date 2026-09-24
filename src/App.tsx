@@ -43,7 +43,14 @@ export default function App() {
   const esNeon = temaActual === 'neon';
 
   return (
-    <div className={`app-shell ${temaActual}`} style={{ color: col.text }}>
+    <div className={`app-shell ${temaActual}`} style={{ color: col.text, position: 'relative' }}>
+      {/* Imagen del estadio en el fondo */}
+      <img 
+        src="./estadio-azul.jpeg" 
+        alt="Estadio" 
+        style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0, opacity: 0.5, pointerEvents: 'none' }} 
+      />
+
       <div className="snow-layer" aria-hidden="true" />
       <div className="light-sheen" aria-hidden="true" />
       <div className="content-shell">
