@@ -6,8 +6,8 @@ interface HeaderProps {
   onIrHome: () => void;
   temaActual: 'oscuro' | 'claro' | 'neon';
   onCambiarTema: () => void;
-  vistaActiva: 'home' | 'foro';
-  onCambiarVistaForo: () => void;
+  vistaActiva: 'home' | 'cara-a-cara';
+  onCambiarVistaCaraACara: () => void;
   onAbrirLogin: () => void;
   usuarioActivo: string;
   onCerrarSesion: () => void;
@@ -18,7 +18,7 @@ export default function Header({
   temaActual,
   onCambiarTema,
   vistaActiva,
-  onCambiarVistaForo,
+  onCambiarVistaCaraACara,
   onAbrirLogin,
   usuarioActivo,
   onCerrarSesion
@@ -27,7 +27,7 @@ export default function Header({
   const [menuPerfilAbierto, setMenuPerfilAbierto] = useState(false);
 
   return (
-    <header style={{ 
+    <header className="site-header" style={{ 
       padding: '10px 20px',
       marginBottom: '18px', 
       display: 'flex', 
@@ -48,6 +48,7 @@ export default function Header({
     }}>
       {/* Izquierda: Logo Oficial Personalizado */}
       <div 
+        className="site-header__brand"
         style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', transition: 'transform 0.2s ease' }} 
         onClick={onIrHome}
         onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.03)')}
@@ -67,7 +68,7 @@ export default function Header({
       </div>
 
       {/* Centro: Redes Sociales y Selector de Temas */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div className="site-header__socials" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         <a 
           href={enlacesRedes.twitter} 
           target="_blank" 
@@ -132,30 +133,16 @@ export default function Header({
         </button>
       </div>
 
-      {/* Derecha: Botones Foro / Ingresar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <button 
-          onClick={onCambiarVistaForo} 
-          style={{ 
-            backgroundColor: vistaActiva === 'foro' ? 'rgba(56, 130, 255, 0.35)' : 'rgba(255, 255, 255, 0.05)', 
-            color: '#FFF', 
-            border: `1px solid ${vistaActiva === 'foro' ? '#3882FF' : 'rgba(255, 255, 255, 0.15)'}`, 
-            padding: '8px 16px', 
-            borderRadius: '9px', 
-            cursor: 'pointer', 
-            fontWeight: '700', 
-            fontSize: '0.8rem', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '6px',
-            letterSpacing: '0.05em',
-            boxShadow: vistaActiva === 'foro' ? '0 0 15px rgba(56, 130, 255, 0.4)' : 'none',
-            transition: 'all 0.2s ease'
-          }}
+      {/* Derecha: acceso a la cuenta */}
+      <div className="site-header__actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <button
+          type="button"
+          className={`header-comparison-button${vistaActiva === 'cara-a-cara' ? ' header-comparison-button--active' : ''}`}
+          onClick={onCambiarVistaCaraACara}
+          aria-pressed={vistaActiva === 'cara-a-cara'}
         >
-           FORO
+          COMPARAR EQUIPOS
         </button>
-
         {usuarioActivo ? (
           <div style={{ position: 'relative' }}>
             <button 

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import type { LigaConfig } from '../types';
 import VistaEquipoDetalle from './VistaEquipoDetalle';
 import VistaPartidoDetalle from './VistaPartidoDetalle';
+import { apiUrl } from '../services/api';
 
 interface Props {
   ligaSeleccionada: LigaConfig;
@@ -130,7 +131,7 @@ export default function VistaLigaDetalle({ ligaSeleccionada, onRegresarGeneral }
           pais: ligaSeleccionada?.paisBuscado || ''
         });
 
-        const respuesta = await fetch(`http://localhost:3001/api/partidos?${params.toString()}`);
+        const respuesta = await fetch(apiUrl(`/api/partidos?${params.toString()}`));
         const data = await respuesta.json();
 
         if (!respuesta.ok) {
@@ -257,7 +258,6 @@ export default function VistaLigaDetalle({ ligaSeleccionada, onRegresarGeneral }
         <h1 style={{ margin: 0, fontSize: 'clamp(1.4rem, 2vw, 2.6rem)', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#F3F4F8' }}>
           {nombreLiga.toUpperCase()}
         </h1>
-        <span style={{ color: '#F2E75A', fontSize: '1.2rem', transform: 'translateY(-2px)' }}>☆</span>
       </div>
 
       {/* Pestañas de Navegación */}

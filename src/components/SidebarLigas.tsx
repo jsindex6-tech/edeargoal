@@ -1,6 +1,7 @@
 // src/components/SidebarLigas.tsx
 import { useState } from 'react';
 import type { LigaConfig } from '../types';
+import { obtenerLogoLiga } from '../services/logosLigas';
 
 interface Props {
   listaLigas: LigaConfig[];
@@ -46,7 +47,7 @@ export default function SidebarLigas({ listaLigas, onSeleccionarLiga, temaActual
           100% { background-position: 0% 50%; }
         }
       `}</style>
-      <div style={{ backgroundColor: esClaro ? 'rgba(247, 251, 255, 0.92)' : 'rgba(13, 18, 36, 0.82)', border: `1px solid ${esClaro ? 'rgba(39, 104, 180, 0.24)' : 'rgba(90, 135, 255, 0.22)'}`, borderRadius: '10px', padding: '15px', maxHeight: '88vh', display: 'flex', flexDirection: 'column', backdropFilter: 'blur(8px)', boxShadow: esClaro ? '0 12px 35px rgba(35, 94, 150, 0.14)' : '0 12px 35px rgba(0, 0, 0, 0.24)' }}>
+      <div style={{ backgroundColor: esClaro ? 'rgba(247, 251, 255, 0.92)' : 'rgba(13, 18, 36, 0.82)', border: `1px solid ${esClaro ? 'rgba(39, 104, 180, 0.24)' : 'rgba(90, 135, 255, 0.22)'}`, borderRadius: '10px', padding: '15px', height: '100%', minHeight: 0, boxSizing: 'border-box', overflow: 'hidden', display: 'flex', flexDirection: 'column', backdropFilter: 'blur(8px)', boxShadow: esClaro ? '0 12px 35px rgba(35, 94, 150, 0.14)' : '0 12px 35px rgba(0, 0, 0, 0.24)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1E2338', paddingBottom: '10px', marginBottom: '10px' }}>
           <span style={{
             color: '#FFFFFF',
@@ -68,7 +69,7 @@ export default function SidebarLigas({ listaLigas, onSeleccionarLiga, temaActual
         style={{ width: '100%', padding: '8px', backgroundColor: esClaro ? '#FFFFFF' : '#0B0D17', border: `1px solid ${esClaro ? '#A9C9E8' : '#1E2338'}`, color: esClaro ? '#10233F' : '#FFF', borderRadius: '5px', marginBottom: '10px', fontSize: '0.85rem', boxSizing: 'border-box' }}
       />
 
-      <div style={{ overflowY: 'auto', maxHeight: '68vh', paddingRight: '5px' }}>
+      <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, paddingRight: '5px' }}>
         {regionesDisponibles.map((region) => {
           const ligasEnRegion = listaLigas.filter(l => 
             l.region === region && 
@@ -154,7 +155,7 @@ export default function SidebarLigas({ listaLigas, onSeleccionarLiga, temaActual
                         {ligasDelPais.map((item: LigaConfig) => (
                           <div
                             key={item.idLiga}
-                            onClick={() => onSeleccionarLiga(item)}
+                            onClick={() => onSeleccionarLiga({ ...item, logo: obtenerLogoLiga(item.idLiga) })}
                             style={{
                               padding: '6px 7px',
                               cursor: 'pointer',
@@ -173,8 +174,15 @@ export default function SidebarLigas({ listaLigas, onSeleccionarLiga, temaActual
                               textTransform: 'uppercase'
                             }}
                           >
-                            <span style={{ width: '18px', height: '18px', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', color: '#FFFFFF', fontSize: '0.52rem', fontWeight: '900', boxShadow: 'none' }}>
-                              {item.nombreMostrar.split(' ').map((palabra) => palabra[0]).join('').slice(0, 3)}
+                            <span style={{ position: 'relative', width: '20px', height: '20px', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', color: '#FFFFFF', fontSize: '0.48rem', fontWeight: 900, overflow: 'hidden' }}>
+                              <span>{item.nombreMostrar.split(' ').map((palabra) => palabra[0]).join('').slice(0, 2)}</span>
+                              <img
+                                src={obtenerLogoLiga(item.idLiga)}
+                                alt=""
+                                loading="eager"
+                                onError={(event) => { event.currentTarget.style.display = 'none'; }}
+                                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: 'rgba(14,18,30,0.88)' }}
+                              />
                             </span>
                             <span style={{ textShadow: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.nombreMostrar}</span>
                           </div>

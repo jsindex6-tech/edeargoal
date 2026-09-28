@@ -6,6 +6,14 @@ export interface Stats {
   tarjetasAmarillas: string;
 }
 
+export interface CanalPartido {
+  id: string;
+  nombre: string;
+  url: string;
+  tipo?: 'canal' | 'informacion';
+  nota?: string;
+}
+
 export interface Partido {
   id: number;
   local: string;
@@ -23,14 +31,17 @@ export interface Partido {
   logoLiga: string;
   pais: string;
   streamUrl: string;
+  canales?: CanalPartido[];
   stats: Stats;
 }
 
 export interface LigaConfig {
   idLiga: number;
+  logo?: string;
   nombreMostrar: string;
   paisBuscado: string;
   ligaBuscada: string;
   codigoPais: string;
   region: 'Sudamérica' | 'Internacional' | 'Europa' | 'Norteamérica' | 'Centroamérica' | 'Asia' | 'Selecciones';
 }
+

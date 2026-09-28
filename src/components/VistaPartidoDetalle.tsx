@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiUrl } from '../services/api';
 
 interface Props { partido: any; onRegresar: () => void }
 
@@ -11,7 +12,7 @@ export default function VistaPartidoDetalle({ partido, onRegresar }: Props) {
     let activo = true;
     const cargarDetalle = async () => {
       try {
-        const respuesta = await fetch(`http://localhost:3001/api/partidos/${partido.id}/detalle?proveedor=${encodeURIComponent(partido.proveedor || 'api-football')}&refresh=1`);
+        const respuesta = await fetch(apiUrl(`/api/partidos/${partido.id}/detalle?proveedor=${encodeURIComponent(partido.proveedor || 'api-football')}&refresh=1`));
         const contenido = await respuesta.text();
         let data: any = {};
         try { data = contenido ? JSON.parse(contenido) : {}; } catch { throw new Error('El backend no devolvió JSON. Reinicia el servidor Backend.'); }
@@ -22,7 +23,7 @@ export default function VistaPartidoDetalle({ partido, onRegresar }: Props) {
       }
     };
     cargarDetalle();
-    const intervalo = window.setInterval(cargarDetalle, 15000);
+    const intervalo = window.setInterval(cargarDetalle, 60000);
     return () => { activo = false; window.clearInterval(intervalo); };
   }, [partido.id, partido.proveedor]);
 
@@ -39,12 +40,19 @@ export default function VistaPartidoDetalle({ partido, onRegresar }: Props) {
   const eventos = datos?.eventos || [];
   const alineaciones = datos?.alineaciones || [];
   const estadisticas = datos?.estadisticas || [];
+  const alineacionEstado = datos?.alineacionEstado || (alineaciones.length ? 'disponible' : 'esperando');
+  const horaAlineacion = datos?.alineacionDisponibleDesde
+    ? new Date(datos.alineacionDisponibleDesde).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+    : '';
   const colorCamiseta = (equipo: any, index: number) => equipo.team?.colors?.player?.primary || (index === 0 ? '#2563EB' : '#F8FAFC');
+  const obtenerFotoJugador = (jugador: any) => jugador.player?.photo || (jugador.player?.id
+    ? `https://media.api-sports.io/football/players/${jugador.player.id}.png`
+    : '');
   const posicionesCancha = [
     { x: 8, y: 50 },
-    { x: 23, y: 18 }, { x: 23, y: 39 }, { x: 23, y: 61 }, { x: 23, y: 82 },
-    { x: 43, y: 25 }, { x: 43, y: 50 }, { x: 43, y: 75 },
-    { x: 68, y: 22 }, { x: 68, y: 50 }, { x: 68, y: 78 }
+    { x: 21, y: 18 }, { x: 21, y: 39 }, { x: 21, y: 61 }, { x: 21, y: 82 },
+    { x: 33, y: 28 }, { x: 33, y: 50 }, { x: 33, y: 72 },
+    { x: 43, y: 30 }, { x: 43, y: 50 }, { x: 43, y: 70 }
   ];
 
   return (
@@ -68,47 +76,285 @@ export default function VistaPartidoDetalle({ partido, onRegresar }: Props) {
       </div>}
       {pestana === 'alineacion' && (
         <div style={{ maxWidth: '1100px', margin: '18px auto', background: '#0D1117', padding: '18px', border: '1px solid rgba(98,230,255,0.18)' }}>
-          <h3 style={{ color: '#62E6FF', textAlign: 'center', letterSpacing: '0.1em' }}>ALINEACIONES Y FORMACIÓN</h3>
-          {alineaciones.length ? (
-            <>
-              {alineaciones.some((equipo: any) => equipo.provisional) && <div style={{ marginBottom: '10px', padding: '8px 10px', border: '1px solid rgba(255,207,74,0.35)', borderRadius: '6px', color: '#FFCF4A', fontSize: '0.72rem' }}>Plantilla real del club. El XI oficial todavía no fue publicado.</div>}
-              <div style={{ position: 'relative', overflow: 'hidden', padding: '18px', border: '2px solid rgba(178,255,194,0.7)', borderRadius: '12px', background: 'radial-gradient(circle at 50% 50%, rgba(80,184,93,0.24), transparent 32%), repeating-linear-gradient(90deg, rgba(255,255,255,0.045) 0 9%, rgba(0,48,19,0.08) 9% 18%), linear-gradient(135deg, #17652e, #07351b 52%, #145b2a)', boxShadow: '0 12px 32px rgba(0,0,0,0.42), inset 0 0 45px rgba(0,0,0,0.25)' }}>
-                <div style={{ position: 'absolute', inset: '12px', border: '2px solid rgba(229,255,231,0.48)', boxShadow: 'inset 0 0 20px rgba(0,0,0,0.2)', pointerEvents: 'none' }} />
-                <div style={{ position: 'absolute', top: '25%', bottom: '25%', left: '12px', width: '15%', border: '2px solid rgba(229,255,231,0.42)', borderLeft: 0, pointerEvents: 'none' }} />
-                <div style={{ position: 'absolute', top: '25%', bottom: '25%', right: '12px', width: '15%', border: '2px solid rgba(229,255,231,0.42)', borderRight: 0, pointerEvents: 'none' }} />
-                <div style={{ position: 'absolute', top: '38%', bottom: '38%', left: '12px', width: '5%', border: '2px solid rgba(229,255,231,0.36)', borderLeft: 0, pointerEvents: 'none' }} />
-                <div style={{ position: 'absolute', top: '38%', bottom: '38%', right: '12px', width: '5%', border: '2px solid rgba(229,255,231,0.36)', borderRight: 0, pointerEvents: 'none' }} />
-                <div style={{ position: 'absolute', top: '12px', bottom: '12px', left: '50%', borderLeft: '2px solid rgba(220,255,222,0.35)', pointerEvents: 'none' }} />
-                <div style={{ position: 'absolute', width: '110px', height: '110px', border: '2px solid rgba(220,255,222,0.42)', borderRadius: '50%', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', boxShadow: '0 0 24px rgba(180,255,194,0.08)', pointerEvents: 'none' }} />
-                <div style={{ position: 'absolute', width: '8px', height: '8px', borderRadius: '50%', background: '#D9FFDE', boxShadow: '0 0 12px #D9FFDE', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }} />
-                <div style={{ position: 'relative', zIndex: 1, aspectRatio: '16 / 9', minHeight: '390px' }}>
-                  {alineaciones.map((equipo: any, index: number) => {
-                    const color = colorCamiseta(equipo, index);
-                    const textoColor = color.toLowerCase() === '#f8fafc' || color.toLowerCase() === '#ffffff' ? '#152018' : '#FFF';
-                    const jugadoresTitulares = (equipo.startXI || []).slice(0, 11);
-                    return <div key={index}>
-                      <div style={{ position: 'absolute', top: '10px', left: index === 0 ? '3%' : '73%', width: '24%', display: 'flex', justifyContent: 'space-between', color: '#FFF', fontSize: '0.7rem', fontWeight: 900, textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}><strong>{equipo.team?.name || 'Equipo'}</strong><span style={{ color: '#E1FF73' }}>{equipo.formation || 'XI pendiente'}</span></div>
-                      {jugadoresTitulares.map((jugador: any, playerIndex: number) => {
-                        const base = posicionesCancha[playerIndex] || { x: 50, y: 50 };
-                        const x = index === 0 ? base.x : 100 - base.x;
-                        const nombre = jugador.player?.name || 'Jugador';
-                        return <div key={playerIndex} title={nombre} style={{ position: 'absolute', left: `${x}%`, top: `${base.y}%`, transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', width: '92px', color: '#FFF', fontSize: '0.58rem', fontWeight: 900, textAlign: 'center', filter: 'drop-shadow(0 3px 4px rgba(0,0,0,0.55))' }}>
-                          {jugador.player?.photo ? <img src={jugador.player.photo} alt="" style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover', border: `3px solid ${color}`, boxShadow: `0 0 12px ${color}88` }} /> : <span style={{ width: '31px', height: '31px', display: 'grid', placeItems: 'center', borderRadius: '8px 8px 12px 12px', background: `linear-gradient(145deg, ${color}, ${color}bb)`, color: textoColor, border: '2px solid rgba(255,255,255,0.9)', boxShadow: `0 0 12px ${color}66`, fontSize: '0.58rem' }}>{jugador.player?.number || nombre.slice(0, 2).toUpperCase()}</span>}
-                          <span style={{ padding: '3px 6px', borderRadius: '5px', background: 'rgba(0,0,0,0.72)', border: '1px solid rgba(255,255,255,0.12)', maxWidth: '92px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nombre}</span>
-                        </div>;
-                      })}
-                    </div>;
-                  })}
-                </div>
-                {alineaciones.map((equipo: any, index: number) => <div key={`subs-${index}`} style={{ marginTop: '8px', color: '#C4D2C6', fontSize: '0.65rem' }}>{equipo.team?.name}: suplentes {(equipo.substitutes || []).map((jugador: any) => jugador.player?.name).filter(Boolean).join(', ') || 'No disponibles'}</div>)}
-              </div>
-            </>
-          ) : (
-            <div style={{ padding: '26px 12px', textAlign: 'center', color: '#A7ADBA', border: '1px dashed rgba(98,230,255,0.25)', borderRadius: '8px' }}>
-              <strong style={{ display: 'block', color: '#FFF', marginBottom: '8px' }}>Alineación pendiente</strong>
-              Las alineaciones oficiales todavía no fueron publicadas por el proveedor para este partido. Cuando estén disponibles aparecerán aquí con sus fotos.
+          <style>{`
+            .lineup-layout {
+              display: flex;
+              flex-direction: column;
+              gap: 14px;
+            }
+            .lineup-header {
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              gap: 18px;
+              color: #62E6FF;
+              letter-spacing: 0.12em;
+              font-weight: 900;
+              text-transform: uppercase;
+              font-size: 0.84rem;
+              padding: 6px 8px 12px;
+            }
+            .lineup-field-wrap {
+              position: relative;
+              overflow: hidden;
+              border-radius: 14px;
+              background: linear-gradient(180deg, rgba(5, 22, 16, 0.95), rgba(5, 26, 17, 0.9));
+              border: 1px solid rgba(154, 220, 173, 0.45);
+              box-shadow: inset 0 0 0 2px rgba(255,255,255,0.08), 0 16px 40px rgba(0,0,0,0.42);
+            }
+            .lineup-field {
+              position: relative;
+              width: 100%;
+              min-height: 460px;
+              background:
+                linear-gradient(90deg, rgba(255,255,255,0.04) 0, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 9%),
+                linear-gradient(180deg, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 7%),
+                radial-gradient(circle at center, rgba(24, 118, 68, 0.42), rgba(6, 33, 18, 0.98) 58%, rgba(7, 21, 15, 0.98));
+              border: 2px solid rgba(186, 243, 205, 0.5);
+              border-radius: 12px;
+              overflow: hidden;
+            }
+            .lineup-field::before,
+            .lineup-field::after {
+              content: "";
+              position: absolute;
+              inset: 16px;
+              pointer-events: none;
+            }
+            .lineup-field::before {
+              border: 2px solid rgba(229,255,231,0.5);
+              border-radius: 12px;
+            }
+            .lineup-field::after {
+              left: 50%;
+              top: 0;
+              bottom: 0;
+              width: 2px;
+              background: rgba(229,255,231,0.5);
+              transform: translateX(-50%);
+            }
+            .center-circle {
+              position: absolute;
+              left: 50%;
+              top: 50%;
+              width: 120px;
+              height: 120px;
+              border: 2px solid rgba(229,255,231,0.45);
+              border-radius: 50%;
+              transform: translate(-50%, -50%);
+            }
+            .penalty-box-left, .penalty-box-right {
+              position: absolute;
+              top: 50%;
+              width: 18%;
+              height: 42%;
+              transform: translateY(-50%);
+              border: 2px solid rgba(229,255,231,0.45);
+            }
+            .penalty-box-left { left: 12px; border-left: 0; }
+            .penalty-box-right { right: 12px; border-right: 0; }
+            .goal-box-left, .goal-box-right {
+              position: absolute;
+              top: 50%;
+              width: 8%;
+              height: 20%;
+              transform: translateY(-50%);
+              border: 2px solid rgba(229,255,231,0.35);
+            }
+            .goal-box-left { left: 12px; border-left: 0; }
+            .goal-box-right { right: 12px; border-right: 0; }
+            .pitch-team-label {
+              position: absolute;
+              top: 12px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              font-size: 0.68rem;
+              font-weight: 900;
+              color: #fff;
+              z-index: 2;
+              text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+            }
+            .pitch-team-label.home { left: 18px; }
+            .pitch-team-label.away { right: 18px; }
+            .pitch-team-label .formation {
+              color: #D8F95B;
+              letter-spacing: 0.06em;
+            }
+            .player-node {
+              position: absolute;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 6px;
+              transform: translate(-50%, -50%);
+              z-index: 2;
+              width: 92px;
+            }
+            .player-head {
+              position: relative;
+              width: 36px;
+              height: 36px;
+              border-radius: 50%;
+              background: rgba(17, 24, 31, 0.95);
+              border: 2px solid rgba(255,255,255,0.8);
+              box-shadow: 0 6px 18px rgba(0,0,0,0.28);
+              overflow: hidden;
+            }
+            .player-head img {
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+              border-radius: 50%;
+              display: block;
+            }
+            .player-body {
+              position: absolute;
+              left: 50%;
+              bottom: -4px;
+              transform: translateX(-50%);
+              width: 24px;
+              height: 20px;
+              border-radius: 11px 11px 6px 6px;
+              border: 2px solid rgba(255,255,255,0.82);
+              box-shadow: inset 0 -2px 0 rgba(255,255,255,0.2);
+            }
+            .player-badge {
+              position: absolute;
+              left: 50%;
+              top: 2px;
+              transform: translateX(-50%);
+              min-width: 16px;
+              height: 16px;
+              padding: 0 4px;
+              border-radius: 10px;
+              background: rgba(9, 12, 14, 0.9);
+              border: 1px solid rgba(255,255,255,0.12);
+              color: #fff;
+              font-size: 0.52rem;
+              font-weight: 900;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+            .player-name {
+              display: inline-block;
+              max-width: 90px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              color: #fff;
+              font-size: 0.56rem;
+              font-weight: 900;
+              background: rgba(0,0,0,0.75);
+              border: 1px solid rgba(255,255,255,0.12);
+              border-radius: 6px;
+              padding: 3px 6px;
+            }
+            .substitutes {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 8px 12px;
+              padding: 10px 4px 2px;
+              color: #C4D2C6;
+              font-size: 0.7rem;
+            }
+            .substitutes strong {
+              color: #fff;
+            }
+            @media (max-width: 767px) {
+              .lineup-field {
+                min-height: 420px;
+              }
+              .player-node {
+                width: 72px;
+              }
+              .player-name {
+                max-width: 68px;
+                font-size: 0.48rem;
+              }
+              .pitch-team-label {
+                font-size: 0.56rem;
+              }
+              .lineup-header {
+                letter-spacing: 0.08em;
+                font-size: 0.72rem;
+              }
+            }
+          `}</style>
+          <div className="lineup-layout">
+            <div className="lineup-header">
+              <span>ALINEACIONES Y FORMACIÓN</span>
             </div>
-          )}
+            {alineaciones.length ? (
+              <>
+                <div className="lineup-field-wrap">
+                  <div className="lineup-field">
+                    <div className="center-circle" />
+                    <div className="penalty-box-left" />
+                    <div className="penalty-box-right" />
+                    <div className="goal-box-left" />
+                    <div className="goal-box-right" />
+
+                    {alineaciones.map((equipo: any, index: number) => {
+                      const color = colorCamiseta(equipo, index);
+                      const jugadoresTitulares = (equipo.startXI || []).slice(0, 11);
+                      return (
+                        <div key={index}>
+                          <div className={`pitch-team-label ${index === 0 ? 'home' : 'away'}`}>
+                            <span>{equipo.team?.name || 'Equipo'}</span>
+                            {equipo.formation && <span className="formation">{equipo.formation}</span>}
+                          </div>
+                          {jugadoresTitulares.map((jugador: any, playerIndex: number) => {
+                            const base = posicionesCancha[playerIndex] || { x: 50, y: 50 };
+                            const x = index === 0 ? base.x : 100 - base.x;
+                            const nombre = jugador.player?.name || 'Jugador';
+                            const foto = obtenerFotoJugador(jugador);
+                            const dorsal = jugador.player?.number ?? '';
+                            return (
+                              <div
+                                key={playerIndex}
+                                className="player-node"
+                                title={nombre}
+                                style={{ left: `${x}%`, top: `${base.y}%` }}
+                              >
+                                <div className="player-head" style={{ borderColor: color }}>
+                                  {foto ? <img src={foto} alt="" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : null}
+                                  {dorsal ? <span className="player-badge" style={{ color }}>{dorsal}</span> : null}
+                                  <span className="player-body" style={{ background: color }} />
+                                </div>
+                                <span className="player-name">{nombre}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="substitutes">
+                  {alineaciones.map((equipo: any, index: number) => (
+                    <div key={`subs-${index}`}>
+                      <strong>{equipo.team?.name || 'Equipo'}:</strong>{' '}
+                      {(equipo.substitutes || []).map((jugador: any) => jugador.player?.name).filter(Boolean).join(', ') || 'No disponibles'}
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div style={{ padding: '26px 12px', textAlign: 'center', color: '#A7ADBA', border: '1px dashed rgba(98,230,255,0.25)', borderRadius: '8px' }}>
+                <strong style={{ display: 'block', color: '#FFF', marginBottom: '8px' }}>
+                  {alineacionEstado === 'esperando' ? 'Alineaciones antes del partido' : 'Alineación real no disponible'}
+                </strong>
+                {alineacionEstado === 'esperando'
+                  ? `La consulta comenzará una hora antes${horaAlineacion ? `, desde las ${horaAlineacion}` : ''}. Se actualizará automáticamente.`
+                  : estadoActual.toLowerCase().includes('finalizado')
+                    ? 'El proveedor no entregó los onces oficiales de este encuentro; no se muestra la plantilla del club como sustituto.'
+                    : 'El proveedor todavía no confirmó los onces. Se seguirá consultando automáticamente.'}
+              </div>
+            )}
+          </div>
         </div>
       )}
       {pestana === 'charla' && <div style={{ maxWidth: '1100px', margin: '18px auto', background: '#0D1117', padding: '24px', color: '#A7ADBA' }}>La charla del partido estará disponible para los usuarios registrados.</div>}

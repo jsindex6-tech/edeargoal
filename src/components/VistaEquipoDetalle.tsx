@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiUrl } from '../services/api';
 
 interface Props {
   equipo: { id: number; nombre: string; logo?: string; proveedor?: string };
@@ -20,7 +21,7 @@ export default function VistaEquipoDetalle({ equipo, ligaId, nombreLiga, onRegre
         setCargando(true);
         setError('');
         const proveedor = equipo.proveedor || 'api-football';
-        const respuesta = await fetch(`http://localhost:3001/api/equipos/${equipo.id}?liga=${ligaId}&nombre=${encodeURIComponent(equipo.nombre)}&proveedor=${proveedor}`);
+        const respuesta = await fetch(apiUrl(`/api/equipos/${equipo.id}?liga=${ligaId}&nombre=${encodeURIComponent(equipo.nombre)}&proveedor=${proveedor}`));
         const resultado = await respuesta.json();
         if (!respuesta.ok) throw new Error(resultado?.mensaje || 'No se pudo cargar el club');
         setDatos(resultado);

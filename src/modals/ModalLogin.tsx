@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
+import { apiUrl } from '../services/api';
 
 interface ModalLoginProps {
   abierto: boolean;
@@ -6,8 +7,7 @@ interface ModalLoginProps {
   colCard: string;
   colBorder: string;
   colText: string;
-  colCardInner: string;
-  esNeon: boolean;
+  temaActual: 'oscuro' | 'claro' | 'neon';
   onSesionIniciada: (correo: string) => void;
 }
 
@@ -17,93 +17,214 @@ export default function ModalLogin({
   colCard,
   colBorder,
   colText,
-  colCardInner,
-  esNeon,
+  temaActual,
   onSesionIniciada
 }: ModalLoginProps) {
-  const [vista, setVista] = useState<'opciones' | 'ingresar' | 'registrar'>('opciones');
+  const [vista, setVista] = useState<'inicio' | 'ingresar' | 'registrar' | 'pendiente' | 'confirmada'>('inicio');
+  const [nombre, setNombre] = useState('');
   const [correo, setCorreo] = useState('');
+  const [codigo, setCodigo] = useState('');
   const [contrasena, setContrasena] = useState('');
   const [confirmacion, setConfirmacion] = useState('');
   const [mensaje, setMensaje] = useState('');
+  const [correoEnviado, setCorreoEnviado] = useState<boolean | null>(null);
+  const [cargando, setCargando] = useState(false);
 
   if (!abierto) return null;
 
   const cerrar = () => {
-    setVista('opciones');
+    setVista('inicio');
+    setNombre('');
     setCorreo('');
+    setCodigo('');
     setContrasena('');
     setConfirmacion('');
     setMensaje('');
+    setCorreoEnviado(null);
     onCerrar();
   };
 
-  const enviarFormulario = () => {
-    if (!correo.includes('@')) {
-      setMensaje('Escribe un correo válido.');
-      return;
+  const confirmarCodigo = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setMensaje('');
+    setCargando(true);
+    try {
+      const respuesta = await fetch(apiUrl('/api/auth/verificar-correo'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ correo, codigo })
+      });
+      const datos = await respuesta.json();
+      if (!respuesta.ok) throw new Error(datos.mensaje || 'No se pudo verificar el código.');
+      onSesionIniciada(datos.usuario.correo);
+      setCorreoEnviado(true);
+      setMensaje(datos.mensaje || '¡Felicidades! Tu cuenta está activa.');
+      setVista('confirmada');
+    } catch (fallo) {
+      setMensaje(fallo instanceof Error ? fallo.message : 'No se pudo verificar el código.');
+    } finally {
+      setCargando(false);
     }
-    if (contrasena.length < 6) {
-      setMensaje('La contraseña debe tener al menos 6 caracteres.');
+  };
+
+  const enviarFormulario = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setMensaje('');
+    if (vista === 'registrar' && contrasena !== confirmacion) {
+      setMensaje('Las contraseñas no coinciden.');
       return;
     }
 
-    const usuarios = JSON.parse(localStorage.getItem('edeargoal_usuarios') || '{}');
-    if (vista === 'registrar') {
-      if (contrasena !== confirmacion) {
-        setMensaje('Las contraseñas no coinciden.');
-        return;
+    setCargando(true);
+    try {
+      const endpoint = vista === 'registrar' ? '/api/auth/registro' : '/api/auth/iniciar-sesion';
+      const respuesta = await fetch(apiUrl(endpoint), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ nombre, correo, contrasena })
+      });
+      const datos = await respuesta.json();
+      if (!respuesta.ok) {
+        if (datos.error === 'EMAIL_NOT_VERIFIED') {
+          setVista('pendiente');
+          setCorreoEnviado(false);
+        }
+        throw new Error(datos.mensaje || 'No se pudo completar la solicitud.');
       }
-      if (usuarios[correo]) {
-        setMensaje('Ese correo ya tiene una cuenta.');
-        return;
-      }
-      usuarios[correo] = contrasena;
-      localStorage.setItem('edeargoal_usuarios', JSON.stringify(usuarios));
-    } else if (usuarios[correo] !== contrasena) {
-      setMensaje('El correo o la contraseña no son correctos.');
-      return;
-    }
 
-    localStorage.setItem('edeargoal_usuario_activo', correo);
-    onSesionIniciada(correo);
-    cerrar();
+      if (vista === 'registrar') {
+        setVista('pendiente');
+        setCorreoEnviado(Boolean(datos.correoEnviado));
+        setMensaje(datos.mensaje || 'Revisa tu correo para activar la cuenta.');
+      } else {
+        onSesionIniciada(datos.usuario.correo);
+        cerrar();
+      }
+    } catch (fallo) {
+      setMensaje(fallo instanceof Error ? fallo.message : 'No se pudo conectar con el servicio de cuentas.');
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const reenviarVerificacion = async () => {
+    setCargando(true);
+    setMensaje('');
+    try {
+      const respuesta = await fetch(apiUrl('/api/auth/reenviar-verificacion'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ correo })
+      });
+      const datos = await respuesta.json();
+      if (!respuesta.ok) throw new Error(datos.mensaje || 'No se pudo reenviar el correo.');
+      setCorreoEnviado(Boolean(datos.correoEnviado));
+      setMensaje(datos.mensaje);
+    } catch (fallo) {
+      setCorreoEnviado(false);
+      setMensaje(fallo instanceof Error ? fallo.message : 'No se pudo enviar el correo.');
+    } finally {
+      setCargando(false);
+    }
   };
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-      <div style={{ backgroundColor: colCard, border: `1px solid ${colBorder}`, padding: '30px', borderRadius: '12px', width: '350px', boxSizing: 'border-box', color: colText, position: 'relative' }}>
-        <h3 style={{ margin: '0 0 20px 0', color: esNeon ? '#FFD700' : '#FFD700', textAlign: 'center' }}>
-          {vista === 'registrar' ? 'Crear cuenta' : 'Entrar a EDEARGOAL'}
-        </h3>
-        {vista === 'opciones' ? (
-          <>
-            <p style={{ color: '#8A90A2', textAlign: 'center', fontSize: '0.85rem', marginBottom: '20px' }}>Accede con tu correo electrónico.</p>
-            <button onClick={() => setVista('ingresar')} style={{ width: '100%', backgroundColor: '#FF3B30', color: '#FFF', border: 'none', padding: '11px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '10px' }}>
-              Continuar con correo
-            </button>
-            <button onClick={() => setVista('registrar')} style={{ width: '100%', backgroundColor: '#B7F000', color: '#10131E', border: 'none', padding: '11px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '10px' }}>
-              Crear cuenta
-            </button>
-          </>
-        ) : (
-          <>
-            <input type="email" placeholder="Correo electrónico" value={correo} onChange={(event) => setCorreo(event.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '12px', backgroundColor: colCardInner, border: `1px solid ${colBorder}`, color: colText, borderRadius: '6px', boxSizing: 'border-box' }} />
-            <input type="password" placeholder="Contraseña" value={contrasena} onChange={(event) => setContrasena(event.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '12px', backgroundColor: colCardInner, border: `1px solid ${colBorder}`, color: colText, borderRadius: '6px', boxSizing: 'border-box' }} />
-            {vista === 'registrar' && <input type="password" placeholder="Repetir contraseña" value={confirmacion} onChange={(event) => setConfirmacion(event.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '12px', backgroundColor: colCardInner, border: `1px solid ${colBorder}`, color: colText, borderRadius: '6px', boxSizing: 'border-box' }} />}
-            {mensaje && <p style={{ color: '#FF6B61', fontSize: '0.78rem', margin: '0 0 12px' }}>{mensaje}</p>}
-            <button onClick={enviarFormulario} style={{ width: '100%', backgroundColor: '#FF3B30', color: '#FFF', border: 'none', padding: '10px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '10px' }}>
-              {vista === 'registrar' ? 'Crear cuenta' : 'Continuar con correo'}
-            </button>
-            <button onClick={() => { setVista('opciones'); setMensaje(''); }} style={{ width: '100%', backgroundColor: 'transparent', color: '#8A90A2', border: `1px solid ${colBorder}`, padding: '8px', borderRadius: '6px', cursor: 'pointer', marginBottom: '10px' }}>
-              Volver
-            </button>
-          </>
+    <div className="auth-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) cerrar(); }}>
+      <section className={`auth-dialog auth-dialog--${temaActual}`} role="dialog" aria-modal="true" aria-labelledby="auth-title" style={{ background: colCard, borderColor: colBorder, color: colText }}>
+        <div className="auth-dialog__topline">
+          <span className="auth-dialog__brand">EDEARGOAL <span>CUENTA</span></span>
+          <button className="auth-dialog__close" type="button" onClick={cerrar} aria-label="Cerrar">×</button>
+        </div>
+
+        {vista === 'inicio' && (
+          <div className="auth-dialog__content">
+            <span className="auth-dialog__eyebrow">TU ESPACIO DE FÚTBOL</span>
+            <h2 id="auth-title">Entra al partido.</h2>
+            <p>Inicia sesión o crea tu cuenta para empezar.</p>
+            {mensaje && <div className="auth-dialog__notice" role="status">{mensaje}</div>}
+            <button className="auth-dialog__primary" type="button" onClick={() => { setVista('registrar'); setMensaje(''); }}>Crear cuenta</button>
+            <button className="auth-dialog__secondary" type="button" onClick={() => { setVista('ingresar'); setMensaje(''); }}>Ya tengo una cuenta</button>
+          </div>
         )}
-        <button onClick={cerrar} style={{ width: '100%', backgroundColor: 'transparent', color: '#8A90A2', border: `1px solid ${colBorder}`, padding: '8px', borderRadius: '6px', cursor: 'pointer' }}>
-          Cancelar
-        </button>
-      </div>
+
+        {(vista === 'ingresar' || vista === 'registrar') && (
+          <form className="auth-dialog__content" onSubmit={enviarFormulario}>
+            <span className="auth-dialog__eyebrow">{vista === 'registrar' ? 'ÚNETE A EDEARGOAL' : 'QUÉ BUENO VERTE DE NUEVO'}</span>
+            <h2 id="auth-title">{vista === 'registrar' ? 'Crea tu cuenta' : 'Inicia sesión'}</h2>
+            {vista === 'registrar' && (
+              <label className="auth-dialog__field">
+                <span>Nombre</span>
+                <input autoComplete="name" value={nombre} onChange={(event) => setNombre(event.target.value)} required maxLength={80} />
+              </label>
+            )}
+            <label className="auth-dialog__field">
+              <span>Correo electrónico</span>
+              <input type="email" autoComplete="email" value={correo} onChange={(event) => setCorreo(event.target.value)} required maxLength={254} />
+            </label>
+            <label className="auth-dialog__field">
+              <span>Contraseña</span>
+              <input type="password" autoComplete={vista === 'registrar' ? 'new-password' : 'current-password'} value={contrasena} onChange={(event) => setContrasena(event.target.value)} required minLength={8} maxLength={128} />
+            </label>
+            {vista === 'registrar' && (
+              <>
+                <label className="auth-dialog__field">
+                  <span>Repite la contraseña</span>
+                  <input type="password" autoComplete="new-password" value={confirmacion} onChange={(event) => setConfirmacion(event.target.value)} required minLength={8} maxLength={128} />
+                </label>
+                <p className="auth-dialog__hint">Usa al menos 8 caracteres. Te enviaremos un código de 6 dígitos al correo.</p>
+              </>
+            )}
+            {mensaje && <p className="auth-dialog__notice" role="alert">{mensaje}</p>}
+            <button className="auth-dialog__primary" type="submit" disabled={cargando}>
+              {cargando ? 'Procesando…' : vista === 'registrar' ? 'Crear cuenta' : 'Entrar'}
+            </button>
+            <button className="auth-dialog__text-button" type="button" onClick={() => { setVista(vista === 'registrar' ? 'ingresar' : 'inicio'); setMensaje(''); }}>
+              {vista === 'registrar' ? 'Ya tengo una cuenta' : 'Volver'}
+            </button>
+          </form>
+        )}
+
+        {vista === 'pendiente' && (
+          <div className="auth-dialog__content">
+            <span className="auth-dialog__eyebrow">UN PASO MÁS</span>
+            <h2 id="auth-title">{correoEnviado === false ? 'Cuenta creada' : 'Ingresa el código'}</h2>
+            <p>{correoEnviado === false
+              ? <>Tu cuenta quedó registrada con <strong>{correo}</strong>, pero sigue pendiente de verificación. Confirma el correo antes de iniciar sesión.</>
+              : <>Escribe el código de 6 dígitos que enviamos a <strong>{correo}</strong>. Vence en 10 minutos.</>}</p>
+            {correoEnviado && (
+              <form className="auth-dialog__otp-form" onSubmit={confirmarCodigo}>
+                <label className="auth-dialog__field">
+                  <span>Código de verificación</span>
+                  <input className="auth-dialog__otp-input" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={codigo} onChange={(event) => setCodigo(event.target.value.replace(/\D/g, '').slice(0, 6))} required aria-label="Código de 6 dígitos" />
+                </label>
+                {mensaje && <p className="auth-dialog__notice" role="alert">{mensaje}</p>}
+                <button className="auth-dialog__primary" type="submit" disabled={cargando || codigo.length !== 6}>
+                  {cargando ? 'Verificando…' : 'Verificar y activar cuenta'}
+                </button>
+              </form>
+            )}
+            {!correoEnviado && mensaje && <p className="auth-dialog__notice auth-dialog__notice--warning" role="status">{mensaje}</p>}
+            <button className="auth-dialog__primary" type="button" onClick={() => void reenviarVerificacion()} disabled={cargando}>
+              {cargando ? 'Enviando…' : correoEnviado === false ? 'Intentar enviar código' : 'Reenviar código'}
+            </button>
+            <button className="auth-dialog__text-button" type="button" onClick={() => { setVista('ingresar'); setMensaje(''); }}>Volver a iniciar sesión</button>
+          </div>
+        )}
+
+        {vista === 'confirmada' && (
+          <div className="auth-dialog__content">
+            <span className="auth-dialog__eyebrow">CORREO VERIFICADO</span>
+            <h2 id="auth-title">¡Cuenta activa!</h2>
+            <p>{mensaje || '¡Felicidades! Te registraste con éxito en EdearGoal.'}</p>
+            <button className="auth-dialog__primary" type="button" onClick={cerrar}>Entrar a EdearGoal</button>
+          </div>
+        )}
+
+        <div className="auth-dialog__footer">Tu correo se usa para proteger el acceso a tu cuenta.</div>
+      </section>
     </div>
   );
 }
