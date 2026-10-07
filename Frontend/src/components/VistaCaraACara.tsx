@@ -167,7 +167,7 @@ export default function VistaCaraACara({ ligas, temaActual }: Props) {
           <h1>Cara a cara</h1>
           <p>Enfrentamientos directos registrados en una competición.</p>
         </div>
-        <span className="cara-a-cara__mark" aria-hidden="true">VS</span>
+        <span className="cara-a-cara__mark" aria-hidden="true">CONTRA</span>
       </header>
 
       <div className="cara-a-cara__selectors">
@@ -185,7 +185,7 @@ export default function VistaCaraACara({ ligas, temaActual }: Props) {
             {equipos.map((equipo) => <option key={equipo.id} value={equipo.id}>{equipo.nombre}</option>)}
           </select>
         </label>
-        <span className="cara-a-cara__versus" aria-hidden="true">VS</span>
+        <span className="cara-a-cara__versus" aria-hidden="true">CONTRA</span>
         <label>
           <span>Equipo 2</span>
           <select value={equipoB} onChange={(event) => setEquipoB(event.target.value)} disabled={!equipos.length}>

@@ -1,6 +1,7 @@
 // src/components/Header.tsx
 import { useState } from 'react';
 import { enlacesRedes } from '../services/sociales';
+import type { UsuarioCuenta } from '../types';
 
 interface HeaderProps {
   onIrHome: () => void;
@@ -9,8 +10,15 @@ interface HeaderProps {
   vistaActiva: 'home' | 'cara-a-cara';
   onCambiarVistaCaraACara: () => void;
   onAbrirLogin: () => void;
-  usuarioActivo: string;
+  usuarioActivo: UsuarioCuenta | null;
   onCerrarSesion: () => void;
+}
+
+function formatearFecha(fecha: string | null | undefined, estilo: 'long' | 'medium') {
+  if (!fecha) return null;
+  const fechaValida = new Date(fecha);
+  if (Number.isNaN(fechaValida.getTime())) return null;
+  return new Intl.DateTimeFormat('es-PE', { dateStyle: estilo, timeZone: 'America/Lima' }).format(fechaValida);
 }
 
 export default function Header({
@@ -25,6 +33,8 @@ export default function Header({
 }: HeaderProps) {
   const esOscuro = temaActual === 'oscuro' || temaActual === 'neon';
   const [menuPerfilAbierto, setMenuPerfilAbierto] = useState(false);
+  const fechaUnion = formatearFecha(usuarioActivo?.fechaUnion, 'long') || 'Fecha no disponible';
+  const fechaAceptacion = formatearFecha(usuarioActivo?.condicionesAceptadasEn, 'medium');
 
   return (
     <header className="site-header" style={{ 
@@ -35,18 +45,20 @@ export default function Header({
       alignItems: 'center', 
       width: '100%',
       boxSizing: 'border-box',
-      background: esOscuro 
-        ? 'linear-gradient(135deg, rgba(10, 18, 38, 0.75) 0%, rgba(5, 10, 24, 0.85) 100%)' 
+      background: esOscuro
+        ? temaActual === 'neon'
+          ? 'linear-gradient(135deg, rgba(11, 27, 54, 0.97) 0%, rgba(5, 14, 31, 0.97) 100%)'
+          : 'linear-gradient(135deg, rgba(8, 11, 18, 0.96) 0%, rgba(5, 7, 11, 0.96) 100%)'
         : 'rgba(255, 255, 255, 0.85)',
       borderRadius: '14px',
       border: `1px solid ${esOscuro ? 'rgba(56, 130, 255, 0.35)' : 'rgba(0, 0, 0, 0.12)'}`,
       backdropFilter: 'blur(12px)',
       WebkitBackdropFilter: 'blur(12px)',
-      boxShadow: esOscuro 
-        ? '0 10px 30px -5px rgba(0, 102, 255, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.15)' 
+      boxShadow: esOscuro
+        ? `0 10px 30px -5px rgba(52, 120, 246, ${temaActual === 'neon' ? '0.24' : '0.16'}), inset 0 1px 1px rgba(255, 255, 255, 0.1)`
         : '0 8px 24px rgba(0, 0, 0, 0.08)'
     }}>
-      {/* Izquierda: Logo Oficial Personalizado */}
+      {/* Identidad de EdearGoal */}
       <div 
         className="site-header__brand"
         style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', transition: 'transform 0.2s ease' }} 
@@ -54,16 +66,11 @@ export default function Header({
         onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.03)')}
         onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
       >
-        <img 
-          src="./edeargoal.jpg" 
-          alt="EDEARGOAL Logo" 
-          style={{
-            height: '48px',
-            width: 'auto',
-            objectFit: 'contain',
-            borderRadius: '8px',
-            filter: 'drop-shadow(0 0 12px rgba(0, 140, 255, 0.9))'
-          }} 
+        <img
+          className="site-header__logo"
+          src="./edeargoal.jpg"
+          alt="EdearGoal"
+          title="EdearGoal, inicio"
         />
       </div>
 
@@ -106,22 +113,11 @@ export default function Header({
         </a>
 
         {/* Botón Cambiar Tema */}
-        <button 
-          onClick={onCambiarTema} 
-          style={{ 
-            background: temaActual === 'neon' ? 'rgba(255, 215, 0, 0.18)' : 'rgba(255, 255, 255, 0.05)', 
-            color: esOscuro ? '#FFF' : '#333', 
-            cursor: 'pointer', 
-            border: `1px solid ${temaActual === 'neon' ? '#FFD700' : 'rgba(255, 255, 255, 0.15)'}`, 
-            padding: '6px 10px', 
-            borderRadius: '10px', 
-            height: '38px', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            transition: 'all 0.2s ease'
-          }} 
-          title="Cambiar tema"
+        <button
+          className={`header-theme-button header-theme-button--${temaActual}`}
+          onClick={onCambiarTema}
+          aria-label={`Tema actual: ${temaActual === 'neon' ? 'azul noche' : temaActual}. Cambiar tema`}
+          title={`Cambiar tema · ${temaActual === 'neon' ? 'azul noche' : 'oscuro'}`}
         >
           <img
             src="./theme-moon.svg"
@@ -145,47 +141,50 @@ export default function Header({
         </button>
         {usuarioActivo ? (
           <div style={{ position: 'relative' }}>
-            <button 
-              onClick={() => setMenuPerfilAbierto((a) => !a)} 
-              title="Abrir perfil" 
-              style={{ width: '40px', height: '40px', borderRadius: '50%', border: '2px solid #3882FF', background: 'linear-gradient(135deg, #1E68FF, #0A2540)', color: '#FFF', cursor: 'pointer', fontSize: '1rem', fontWeight: '900', boxShadow: '0 0 15px rgba(56, 130, 255, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 22px rgb(255, 129, 45)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 18px rgb(255, 129, 45)'; }}
+            <button
+              className="header-profile-button"
+              onClick={() => setMenuPerfilAbierto((a) => !a)}
+              title="Abrir perfil"
+              aria-label="Abrir perfil"
+              aria-expanded={menuPerfilAbierto}
             >
-              {usuarioActivo.charAt(0).toUpperCase()}
+              {(usuarioActivo.apodo || usuarioActivo.nombre || usuarioActivo.correo).charAt(0).toUpperCase()}
             </button>
             {menuPerfilAbierto && (
-              <div style={{ position: 'absolute', right: 0, top: '50px', width: '220px', padding: '14px', background: 'rgba(10, 18, 38, 0.95)', border: '1px solid #3882FF', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)', zIndex: 20, backdropFilter: 'blur(10px)' }}>
-                <div style={{ color: '#8A90A2', fontSize: '0.72rem', marginBottom: '4px' }}>Sesión iniciada</div>
-                <div style={{ color: '#FFF', fontSize: '0.85rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '12px' }}>{usuarioActivo}</div>
-                <button onClick={() => { setMenuPerfilAbierto(false); onCerrarSesion(); }} style={{ width: '100%', padding: '9px', borderRadius: '8px', border: '1px solid rgba(255, 59, 48, 0.6)', background: 'rgba(255, 59, 48, 0.15)', color: '#FF453A', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.75rem', transition: 'all 0.2s ease' }}>
+              <div style={{ position: 'absolute', right: 0, top: '50px', width: 'min(280px, calc(100vw - 32px))', padding: '16px', background: 'rgba(10, 18, 38, 0.97)', border: '1px solid #3882FF', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)', zIndex: 20, backdropFilter: 'blur(10px)' }}>
+                <div style={{ color: '#8A90A2', fontSize: '0.72rem', marginBottom: '4px' }}>MI CUENTA</div>
+                <div style={{ color: '#FFF', fontSize: '1rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{usuarioActivo.apodo || usuarioActivo.nombre}</div>
+                <div style={{ color: '#AAB7CC', fontSize: '0.78rem', overflowWrap: 'anywhere', margin: '3px 0 14px' }}>{usuarioActivo.correo}</div>
+                <div style={{ borderTop: '1px solid rgba(145, 186, 255, 0.18)', paddingTop: '12px', display: 'grid', gap: '10px', marginBottom: '14px' }}>
+                  <div>
+                    <div style={{ color: '#8A90A2', fontSize: '0.68rem' }}>EQUIPO FAVORITO</div>
+                    <div style={{ color: '#FFF', fontSize: '0.82rem' }}>{usuarioActivo.equipoFavorito || 'Aún no indicado'}</div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#8A90A2', fontSize: '0.68rem' }}>MIEMBRO DESDE</div>
+                    <div style={{ color: '#FFF', fontSize: '0.82rem' }}>{fechaUnion}</div>
+                  </div>
+                  {fechaAceptacion && (
+                    <div>
+                      <div style={{ color: '#8A90A2', fontSize: '0.68rem' }}>CONDICIONES ACEPTADAS</div>
+                      <div style={{ color: '#FFF', fontSize: '0.82rem' }}>{fechaAceptacion}</div>
+                      {usuarioActivo.versionCondiciones && (
+                        <div style={{ color: '#AAB7CC', fontSize: '0.7rem' }}>Versión {usuarioActivo.versionCondiciones}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <button className="header-logout-button" onClick={() => { setMenuPerfilAbierto(false); onCerrarSesion(); }}>
                   CERRAR SESIÓN
                 </button>
               </div>
             )}
           </div>
         ) : (
-          <button 
-            onClick={onAbrirLogin} 
-            title="Iniciar sesión" 
-            style={{ 
-              background: 'linear-gradient(135deg, #3e30fffd 0%, #3e30fffd 0%', 
-              color: '#FFF', 
-              border: 'none', 
-              padding: '9px 20px', 
-              borderRadius: '9px', 
-              cursor: 'pointer', 
-              fontWeight: '800', 
-              fontSize: '0.8rem', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px', 
-              letterSpacing: '0.03em',
-              boxShadow: '0 4px 18px rgba(255, 45, 85, 0.45)',
-              transition: 'transform 0.2s ease, box-shadow 0.2s ease'
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 22px rgba(108, 45, 255, 0.6)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 18px rgb(195, 45, 255)'; }}
+          <button
+            className="header-login-button"
+            onClick={onAbrirLogin}
+            title="Iniciar sesión"
           >
              INGRESAR
           </button>

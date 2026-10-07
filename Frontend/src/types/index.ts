@@ -45,3 +45,12 @@ export interface LigaConfig {
   region: 'Sudamérica' | 'Internacional' | 'Europa' | 'Norteamérica' | 'Centroamérica' | 'Asia' | 'Selecciones';
 }
 
+export interface UsuarioCuenta {
+  nombre: string;
+  apodo: string;
+  correo: string;
+  equipoFavorito: string;
+  fechaUnion: string;
+  condicionesAceptadasEn: string | null;
+  versionCondiciones: string | null;
+}

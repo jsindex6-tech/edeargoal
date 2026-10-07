@@ -323,12 +323,12 @@ export default function VistaLigaDetalle({ ligaSeleccionada, onRegresarGeneral }
           <svg width="26" height="26" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="flechaAzulGrad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stopColor="#00D0FF" />
-                <stop offset="50%" stopColor="#0055FF" />
+                <stop offset="0%" stopColor="#78A9FF" />
+                <stop offset="50%" stopColor="#3478F6" />
                 <stop offset="100%" stopColor="#001144" />
               </linearGradient>
             </defs>
-            <path d="M 45 15 C 75 15, 92 35, 88 65 C 85 80, 70 88, 55 85 C 70 80, 76 68, 73 55 C 68 38, 52 32, 45 32 L 45 45 L 10 23.5 L 45 2 Z" fill="url(#flechaAzulGrad)" stroke="#00D0FF" strokeWidth="2" strokeLinejoin="round" />
+            <path d="M 45 15 C 75 15, 92 35, 88 65 C 85 80, 70 88, 55 85 C 70 80, 76 68, 73 55 C 68 38, 52 32, 45 32 L 45 45 L 10 23.5 L 45 2 Z" fill="url(#flechaAzulGrad)" stroke="#78A9FF" strokeWidth="2" strokeLinejoin="round" />
             <path d="M 45 6 L 16 23.5 L 45 41 L 45 32 C 55 32, 70 38, 74 55 C 75 42, 65 20, 45 18 Z" fill="white" fillOpacity="0.4" />
           </svg>
         </button>
@@ -364,7 +364,7 @@ export default function VistaLigaDetalle({ ligaSeleccionada, onRegresarGeneral }
               style={{
                 cursor: 'pointer',
                 color: activo ? '#FFF' : '#A7ADBA',
-                borderBottom: activo ? '2px solid #D8F95B' : 'none',
+                borderBottom: activo ? '2px solid #3478F6' : 'none',
                 paddingBottom: '10px',
                 transition: 'color 0.2s ease'
               }}
@@ -448,21 +448,27 @@ export default function VistaLigaDetalle({ ligaSeleccionada, onRegresarGeneral }
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 10px 8px', color: '#EDEFFE', fontWeight: 700 }}>
                 <button
+                  type="button"
+                  className="match-round-nav"
                   onClick={() => indiceJornada > 0 && setJornadaSeleccionada(jornadas[indiceJornada - 1])}
                   disabled={indiceJornada <= 0}
-                  style={{ background: 'transparent', border: 'none', color: indiceJornada > 0 ? '#FFF' : '#4C5361', fontSize: '1.2rem', cursor: indiceJornada > 0 ? 'pointer' : 'default' }}
+                  aria-label="Ver fecha anterior"
+                  title="Fecha anterior"
                 >
-                  ‹
+                  <span className="match-round-nav__chevron" aria-hidden="true" />
                 </button>
                 <span style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                   {jornadaActiva ? partidosDeJornada[0]?.jornadaTexto || `Fecha ${jornadaActiva}` : 'Sin jornada'}
                 </span>
                 <button
+                  type="button"
+                  className="match-round-nav"
                   onClick={() => indiceJornada >= 0 && indiceJornada < jornadas.length - 1 && setJornadaSeleccionada(jornadas[indiceJornada + 1])}
                   disabled={indiceJornada < 0 || indiceJornada >= jornadas.length - 1}
-                  style={{ background: 'transparent', border: 'none', color: indiceJornada >= 0 && indiceJornada < jornadas.length - 1 ? '#FFF' : '#4C5361', fontSize: '1.2rem', cursor: indiceJornada >= 0 && indiceJornada < jornadas.length - 1 ? 'pointer' : 'default' }}
+                  aria-label="Ver fecha siguiente"
+                  title="Fecha siguiente"
                 >
-                  ›
+                  <span className="match-round-nav__chevron match-round-nav__chevron--next" aria-hidden="true" />
                 </button>
               </div>
 
@@ -472,9 +478,9 @@ export default function VistaLigaDetalle({ ligaSeleccionada, onRegresarGeneral }
                   const estadoPartido = String(partido.estadoPartido || '').toLowerCase();
                   const partidoEnVivo = estadoPartido.includes('vivo') || estadoPartido.includes('entretiempo');
                   const tieneMarcador = Boolean(partido.marcador && partido.marcador !== 'VS');
-                  const colorEstado = partidoEnVivo ? '#FFCF4A' : partidoFinalizado ? '#FF8FA3' : '#62E6FF';
+                  const colorEstado = partidoEnVivo ? '#FFCF4A' : partidoFinalizado ? '#FF8FA3' : '#91BAFF';
                   return (
-                    <div key={partido.id || index} onClick={() => seleccionarPartido(partido)} style={{ background: partidoEnVivo ? 'linear-gradient(135deg, #252015, #151922)' : 'linear-gradient(135deg, #111A27, #0F141D)', borderRadius: '8px', padding: '10px', border: `1px solid ${partidoEnVivo ? 'rgba(255,207,74,0.65)' : 'rgba(98,230,255,0.15)'}`, cursor: partido.id ? 'pointer' : 'default' }}>
+                    <div key={partido.id || index} onClick={() => seleccionarPartido(partido)} style={{ background: partidoEnVivo ? 'linear-gradient(135deg, #252015, #151922)' : 'linear-gradient(135deg, #111A27, #0F141D)', borderRadius: '8px', padding: '10px', border: `1px solid ${partidoEnVivo ? 'rgba(255,207,74,0.65)' : 'rgba(52,120,246,0.18)'}`, cursor: partido.id ? 'pointer' : 'default' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: colorEstado, fontWeight: 900, textTransform: 'uppercase' }}>
                         {partidoFinalizado || partidoEnVivo ? <span>{partido.estadoPartido || partido.estado || 'En Vivo'}</span> : <span>{partido.fechaTexto || partido.fechaISO || ''}</span>}
                         <span>{partidoFinalizado ? partido.fechaTexto || partido.fechaISO || '' : partido.hora || ''}</span>
@@ -484,8 +490,8 @@ export default function VistaLigaDetalle({ ligaSeleccionada, onRegresarGeneral }
                           {partido.logoLocal && <img src={partido.logoLocal} alt="" style={{ width: '25px', height: '25px', objectFit: 'contain', flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
                           <span>{partido.local}</span>
                         </div>
-                        {(partidoFinalizado || partidoEnVivo) && tieneMarcador && <div style={{ fontSize: '0.82rem', fontWeight: 950, color: '#D8F95B' }}>{partido.marcador}</div>}
-                        {!partidoFinalizado && !partidoEnVivo && <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#62E6FF' }}>VS</div>}
+                        {(partidoFinalizado || partidoEnVivo) && tieneMarcador && <div style={{ fontSize: '0.82rem', fontWeight: 950, color: '#91BAFF' }}>{partido.marcador}</div>}
+                        {!partidoFinalizado && !partidoEnVivo && <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#91BAFF' }}>CONTRA</div>}
                         {partidoEnVivo && !tieneMarcador && <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#FFCF4A' }}>EN VIVO</div>}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '7px', minWidth: 0, textAlign: 'right', color: '#FFF', fontSize: '0.72rem', fontWeight: 800 }}>
                           <span>{partido.visitante}</span>
@@ -509,7 +515,7 @@ export default function VistaLigaDetalle({ ligaSeleccionada, onRegresarGeneral }
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '10px' }}>
               {equiposDatos.map((equipo, index) => (
                 <div key={equipo.id || index} onClick={() => seleccionarEquipo(equipo)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', background: index % 2 === 0 ? '#111823' : '#0D131C', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '7px', color: '#FFF', fontWeight: 700, cursor: equipo.id ? 'pointer' : 'default' }}>
-                  {equipo.logo ? <img src={equipo.logo} alt="" style={{ width: '28px', height: '28px', objectFit: 'contain' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : <span style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#D8F95B', color: '#0D1117', display: 'grid', placeItems: 'center', fontSize: '0.65rem' }}>{obtenerNombreEquipo(equipo).slice(0, 2).toUpperCase()}</span>}
+                  {equipo.logo ? <img src={equipo.logo} alt="" style={{ width: '28px', height: '28px', objectFit: 'contain' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : <span style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#3478F6', color: '#F5F8FF', display: 'grid', placeItems: 'center', fontSize: '0.65rem' }}>{obtenerNombreEquipo(equipo).slice(0, 2).toUpperCase()}</span>}
                   <span>{obtenerNombreEquipo(equipo)}</span>
                 </div>
               ))}

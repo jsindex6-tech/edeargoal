@@ -76,10 +76,22 @@ function obtenerTemporadaESPN(idLiga, fecha = new Date()) {
   return configuracion.seasonType === 'european' && mes < 7 ? año - 1 : año;
 }
 
+function partesFechaPeru(fecha) {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: 'America/Lima'
+  }).formatToParts(new Date(fecha));
+  const valores = Object.fromEntries(partes.map((parte) => [parte.type, parte.value]));
+  return { año: Number(valores.year), mes: Number(valores.month), dia: Number(valores.day) };
+}
+
 function fechaDeInicioDeSemana(fecha) {
-  const inicio = new Date(fecha);
-  if (Number.isNaN(inicio.getTime())) return null;
-  inicio.setUTCHours(0, 0, 0, 0);
+  const instantanea = new Date(fecha);
+  if (Number.isNaN(instantanea.getTime())) return null;
+  const { año, mes, dia } = partesFechaPeru(instantanea);
+  const inicio = new Date(Date.UTC(año, mes - 1, dia));
   inicio.setUTCDate(inicio.getUTCDate() - ((inicio.getUTCDay() + 6) % 7));
   return inicio.toISOString().slice(0, 10);
 }
@@ -91,7 +103,7 @@ function formatearFecha(fecha) {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-    timeZone: 'UTC'
+    timeZone: 'America/Lima'
   });
 }
 
@@ -100,7 +112,7 @@ function formatearHora(fecha) {
   return new Date(fecha).toLocaleTimeString('es-ES', {
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: 'UTC'
+    timeZone: 'America/Lima'
   });
 }
 
@@ -131,6 +143,7 @@ function normalizarPartidoESPN(evento, liga, jornadas = new Map()) {
     golesVisitante !== null && golesVisitante !== undefined;
   const fecha = evento.date || '';
   const semana = jornadas.get(fechaDeInicioDeSemana(fecha));
+  const fechaLocal = fecha ? partesFechaPeru(fecha) : null;
   const logos = (equipo) => equipo.team.logos?.[0]?.href || equipo.team.logo || '';
 
   return {
@@ -145,7 +158,9 @@ function normalizarPartidoESPN(evento, liga, jornadas = new Map()) {
     jornada: semana?.jornada || null,
     jornadaTexto: semana?.texto || '',
     finalizado: Boolean(terminado && tieneMarcador),
-    fechaISO: fecha.slice(0, 10),
+    fechaISO: fechaLocal
+      ? `${fechaLocal.año}-${String(fechaLocal.mes).padStart(2, '0')}-${String(fechaLocal.dia).padStart(2, '0')}`
+      : '',
     fechaUtc: fecha,
     proveedor: 'espn',
     fechaTexto: formatearFecha(fecha),

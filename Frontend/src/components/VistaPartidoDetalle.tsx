@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchApi } from '../services/api';
+import { traducirEstadoPartido, traducirEstadisticaPartido, traducirEventoPartido } from '../utils/traduccionesFutbol';
 
 interface PartidoDetalleSeleccionado {
   id: number | string;
@@ -113,8 +114,8 @@ export default function VistaPartidoDetalle({ partido, onRegresar }: Props) {
   const logoVisitante = partidoApi?.teams?.away?.logo || partido.logoVisitante;
   const golesLocal = partidoApi?.goals?.home ?? (partido.marcador?.split(' - ')[0] || '-');
   const golesVisitante = partidoApi?.goals?.away ?? (partido.marcador?.split(' - ')[1] || '-');
-  const estadoProveedor = String(partidoApi?.fixture?.status?.long || partidoApi?.fixture?.status?.short || partido.estadoPartido || 'PARTIDO');
-  const estadoActual = /half|ht|entretiempo|live|in play|en vivo/i.test(estadoProveedor) ? (/(half|ht|entretiempo)/i.test(estadoProveedor) ? 'Entretiempo' : 'En vivo') : /finished|finalizado|ft/i.test(estadoProveedor) ? 'Finalizado' : estadoProveedor;
+  const estadoProveedor = String(partidoApi?.fixture?.status?.long || partidoApi?.fixture?.status?.short || partido.estadoPartido || '');
+  const estadoActual = traducirEstadoPartido(estadoProveedor);
   const minutoActual = partidoApi?.fixture?.status?.elapsed;
   const eventos = datos?.eventos || [];
   const alineaciones = datos?.alineaciones || [];
@@ -138,23 +139,23 @@ export default function VistaPartidoDetalle({ partido, onRegresar }: Props) {
     <div style={{ minHeight: '100%', background: '#080A0D', color: '#FFF', padding: '22px 28px 40px' }}>
       <button onClick={onRegresar} style={{ border: 0, background: 'transparent', color: '#FFF', cursor: 'pointer', fontWeight: 900, marginBottom: '22px' }}>← INICIO / PARTIDO</button>
       <div style={{ border: '1px solid rgba(255,255,255,0.12)', background: '#111', maxWidth: '1100px', margin: '0 auto' }}>
-        <div style={{ padding: '9px 14px', color: '#A7ADBA', fontSize: '0.72rem', display: 'flex', justifyContent: 'space-between' }}><span>{partido.liga || 'Competición'} / Fecha {partido.jornada || '-'}</span><strong style={{ color: String(estadoActual).toLowerCase().includes('live') || String(estadoActual).toLowerCase().includes('entre') ? '#D8F95B' : '#FF91A4' }}>{estadoActual}</strong></div>
+        <div style={{ padding: '9px 14px', color: '#A7ADBA', fontSize: '0.72rem', display: 'flex', justifyContent: 'space-between' }}><span>{partido.liga || 'Competición'} / Fecha {partido.jornada || '-'}</span><strong style={{ color: ['En vivo', 'Entretiempo'].includes(estadoActual) ? '#91BAFF' : '#FF91A4' }}>{estadoActual}</strong></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', padding: '25px 20px', textAlign: 'center' }}>
           <div><img src={logoLocal} alt="" style={{ width: '64px', height: '64px', objectFit: 'contain' }} /><h2 style={{ fontSize: '1rem', margin: '8px 0 0' }}>{local}</h2></div>
-          <div><strong style={{ fontSize: '2.5rem', color: '#D8F95B' }}>{golesLocal} - {golesVisitante}</strong><div style={{ color: '#D8F95B', fontSize: '0.72rem', fontWeight: 900, marginTop: '5px' }}>{minutoActual ? `${minutoActual}' · ` : ''}{estadoActual}</div></div>
+          <div><strong style={{ fontSize: '2.5rem', color: '#91BAFF' }}>{golesLocal} - {golesVisitante}</strong><div style={{ color: '#91BAFF', fontSize: '0.72rem', fontWeight: 900, marginTop: '5px' }}>{minutoActual ? `${minutoActual}' · ` : ''}{estadoActual}</div></div>
           <div><img src={logoVisitante} alt="" style={{ width: '64px', height: '64px', objectFit: 'contain' }} /><h2 style={{ fontSize: '1rem', margin: '8px 0 0' }}>{visitante}</h2></div>
         </div>
       </div>
       <div style={{ maxWidth: '1100px', margin: '18px auto 0', display: 'flex', gap: '28px', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
-        {(['resumen', 'alineacion', 'charla'] as const).map((item) => <button key={item} onClick={() => setPestana(item)} style={{ border: 0, borderBottom: pestana === item ? '2px solid #D8F95B' : '2px solid transparent', background: 'transparent', color: pestana === item ? '#D8F95B' : '#A7ADBA', padding: '12px 4px', fontWeight: 900, textTransform: 'uppercase', cursor: 'pointer' }}>{item === 'resumen' ? 'Resumen' : item === 'alineacion' ? 'Alineación' : 'Charla'}</button>)}
+        {(['resumen', 'alineacion', 'charla'] as const).map((item) => <button key={item} onClick={() => setPestana(item)} style={{ border: 0, borderBottom: pestana === item ? '2px solid #3478F6' : '2px solid transparent', background: 'transparent', color: pestana === item ? '#91BAFF' : '#A7ADBA', padding: '12px 4px', fontWeight: 900, textTransform: 'uppercase', cursor: 'pointer' }}>{item === 'resumen' ? 'Resumen' : item === 'alineacion' ? 'Alineación' : 'Charla'}</button>)}
       </div>
       {error && <div style={{ maxWidth: '1100px', margin: '18px auto', color: '#FF91A4' }}>{error}</div>}
       {pestana === 'resumen' && <div style={{ maxWidth: '1100px', margin: '18px auto', display: 'grid', gap: '14px' }}>
-        <section style={{ background: '#0D1117', border: '1px solid rgba(255,255,255,0.1)' }}><h3 style={{ textAlign: 'center', color: '#A7ADBA', letterSpacing: '0.1em' }}>MINUTO A MINUTO</h3>{eventos.length ? eventos.map((evento, index) => <div key={index} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 1fr', padding: '12px', borderTop: '1px solid rgba(255,255,255,0.07)' }}><span>{evento.detail || evento.type || 'Evento'}<small style={{ display: 'block', color: '#A7ADBA' }}>{evento.player?.name || ''}</small></span><strong style={{ textAlign: 'center', color: '#D8F95B' }}>{evento.time?.elapsed ? `${evento.time.elapsed}'` : ''}</strong><span style={{ textAlign: 'right' }}>{evento.team?.name || ''}</span></div>) : <p style={{ padding: '12px', color: '#A7ADBA' }}>No hay eventos registrados todavía.</p>}</section>
-        <section style={{ background: '#0D1117', border: '1px solid rgba(255,255,255,0.1)', padding: '14px' }}><h3 style={{ textAlign: 'center', color: '#A7ADBA', letterSpacing: '0.1em' }}>ESTADÍSTICAS</h3>{estadisticas.map((equipo, index) => <div key={index} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px', marginBottom: '12px' }}><strong>{equipo.team?.name}</strong>{(equipo.statistics || []).map((item, itemIndex) => <div key={itemIndex} style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.07)', padding: '7px', color: '#A7ADBA' }}><span>{item.type}</span><strong style={{ color: '#FFF' }}>{item.value ?? '-'}</strong></div>)}</div>)}</section>
+        <section style={{ background: '#0D1117', border: '1px solid rgba(255,255,255,0.1)' }}><h3 style={{ textAlign: 'center', color: '#A7ADBA', letterSpacing: '0.1em' }}>MINUTO A MINUTO</h3>{eventos.length ? eventos.map((evento, index) => <div key={index} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 1fr', padding: '12px', borderTop: '1px solid rgba(255,255,255,0.07)' }}><span>{traducirEventoPartido(evento.detail || evento.type || '')}<small style={{ display: 'block', color: '#A7ADBA' }}>{evento.player?.name || ''}</small></span><strong style={{ textAlign: 'center', color: '#91BAFF' }}>{evento.time?.elapsed ? `${evento.time.elapsed}'` : ''}</strong><span style={{ textAlign: 'right' }}>{evento.team?.name || ''}</span></div>) : <p style={{ padding: '12px', color: '#A7ADBA' }}>No hay eventos registrados todavía.</p>}</section>
+        <section style={{ background: '#0D1117', border: '1px solid rgba(255,255,255,0.1)', padding: '14px' }}><h3 style={{ textAlign: 'center', color: '#A7ADBA', letterSpacing: '0.1em' }}>ESTADÍSTICAS</h3>{estadisticas.map((equipo, index) => <div key={index} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px', marginBottom: '12px' }}><strong>{equipo.team?.name}</strong>{(equipo.statistics || []).map((item, itemIndex) => <div key={itemIndex} style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.07)', padding: '7px', color: '#A7ADBA' }}><span>{traducirEstadisticaPartido(item.type || '')}</span><strong style={{ color: '#FFF' }}>{item.value ?? '-'}</strong></div>)}</div>)}</section>
       </div>}
       {pestana === 'alineacion' && (
-        <div style={{ maxWidth: '1100px', margin: '18px auto', background: '#0D1117', padding: '18px', border: '1px solid rgba(98,230,255,0.18)' }}>
+        <div style={{ maxWidth: '1100px', margin: '18px auto', background: '#0D1117', padding: '18px', border: '1px solid rgba(52,120,246,0.18)' }}>
           <style>{`
             .lineup-layout {
               display: flex;
@@ -166,7 +167,7 @@ export default function VistaPartidoDetalle({ partido, onRegresar }: Props) {
               justify-content: center;
               align-items: center;
               gap: 18px;
-              color: #62E6FF;
+              color: #91BAFF;
               letter-spacing: 0.12em;
               font-weight: 900;
               text-transform: uppercase;
@@ -257,7 +258,7 @@ export default function VistaPartidoDetalle({ partido, onRegresar }: Props) {
             .pitch-team-label.home { left: 18px; }
             .pitch-team-label.away { right: 18px; }
             .pitch-team-label .formation {
-              color: #D8F95B;
+              color: #91BAFF;
               letter-spacing: 0.06em;
             }
             .player-node {
@@ -422,7 +423,7 @@ export default function VistaPartidoDetalle({ partido, onRegresar }: Props) {
                 </div>
               </>
             ) : (
-              <div style={{ padding: '26px 12px', textAlign: 'center', color: '#A7ADBA', border: '1px dashed rgba(98,230,255,0.25)', borderRadius: '8px' }}>
+              <div style={{ padding: '26px 12px', textAlign: 'center', color: '#A7ADBA', border: '1px dashed rgba(52,120,246,0.25)', borderRadius: '8px' }}>
                 <strong style={{ display: 'block', color: '#FFF', marginBottom: '8px' }}>
                   {alineacionEstado === 'esperando' ? 'Alineaciones antes del partido' : 'Alineación real no disponible'}
                 </strong>

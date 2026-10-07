@@ -9,6 +9,46 @@ interface Props {
   colTextMuted: string;
 }
 
+interface PartidoEnVivo {
+  id?: number | string;
+  local: string;
+  visitante: string;
+  logoLocal?: string;
+  logoVisitante?: string;
+  marcador?: string;
+  estadoPartido?: string;
+  fechaUtc?: string;
+  hora?: string;
+  liga?: string;
+  proveedor?: string;
+  finalizado?: boolean;
+}
+
+interface RespuestaPartidosEnVivo {
+  mensaje?: string;
+  partidos?: PartidoEnVivo[];
+  aviso?: string;
+  proveedor?: string;
+}
+
+function fechaActualEnPeru() {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: 'America/Lima'
+  }).formatToParts(new Date());
+  const valores = Object.fromEntries(partes.map((parte) => [parte.type, parte.value]));
+  return `${valores.year}-${valores.month}-${valores.day}`;
+}
+
+function estaEnVivo(partido: PartidoEnVivo) {
+  const estado = String(partido.estadoPartido || '').toLowerCase();
+  return !partido.finalizado && (
+    ['en vivo', 'entretiempo', 'in_play', 'live', '1h', '2h', 'et', 'ht', 'paused', 'in play'].includes(estado)
+  );
+}
+
 export default function PartidosEnVivo({ colBorder, colText, colTextMuted }: Props) {
   const [partidoAbierto, setPartidoAbierto] = useState<string | null>(null);
   const [canalActivo, setCanalActivo] = useState<{ eventoId: string; canal: CanalPartido } | null>(null);
@@ -17,6 +57,39 @@ export default function PartidosEnVivo({ colBorder, colText, colTextMuted }: Pro
   const [cargandoAgenda, setCargandoAgenda] = useState(true);
   const [errorAgenda, setErrorAgenda] = useState('');
   const [pais, setPais] = useState('');
+  const [partidosEnVivo, setPartidosEnVivo] = useState<PartidoEnVivo[]>([]);
+  const [cargandoEnVivo, setCargandoEnVivo] = useState(true);
+  const [errorEnVivo, setErrorEnVivo] = useState('');
+
+  useEffect(() => {
+    const controlador = new AbortController();
+    const cargarPartidosEnVivo = async () => {
+      try {
+        const fecha = fechaActualEnPeru();
+        const respuesta = await fetchApi(`/api/partidos?fecha=${fecha}`, { signal: controlador.signal });
+        const datos = await leerRespuestaJson<RespuestaPartidosEnVivo | PartidoEnVivo[]>(respuesta);
+        if (!respuesta.ok) {
+          throw new Error(Array.isArray(datos) ? 'No se pudo consultar el marcador en vivo.' : datos.mensaje || 'No se pudo consultar el marcador en vivo.');
+        }
+        const partidos = Array.isArray(datos) ? datos : datos.partidos || [];
+        setPartidosEnVivo(partidos.filter(estaEnVivo));
+        setErrorEnVivo(Array.isArray(datos) ? '' : datos.aviso || '');
+      } catch (error) {
+        if (!controlador.signal.aborted) {
+          setErrorEnVivo(error instanceof Error ? error.message : 'No se pudo consultar el marcador en vivo.');
+        }
+      } finally {
+        if (!controlador.signal.aborted) setCargandoEnVivo(false);
+      }
+    };
+
+    void cargarPartidosEnVivo();
+    const intervalo = window.setInterval(() => void cargarPartidosEnVivo(), 60 * 1000);
+    return () => {
+      controlador.abort();
+      window.clearInterval(intervalo);
+    };
+  }, []);
 
   useEffect(() => {
     const controlador = new AbortController();
@@ -61,57 +134,67 @@ export default function PartidosEnVivo({ colBorder, colText, colTextMuted }: Pro
 
   return (
     <div
-      style={{
-        position: 'relative',
-        zIndex: 1,
-        marginTop: '18px',
-        padding: '0 18px 20px',
-      }}
+      className="home-live-section"
     >
-      <div
-        style={{
-          maxWidth: '1120px',
-          margin: '0 auto',
-          background: 'linear-gradient(155deg, rgba(9,17,31,0.98), rgba(5,10,19,0.97))',
-          border: '1px solid rgba(96, 172, 255, 0.28)',
-          borderRadius: '12px',
-          overflow: 'hidden',
-          boxShadow: '0 18px 48px rgba(0, 5, 15, 0.48), inset 0 1px rgba(255,255,255,0.04)',
-        }}
-      >
+      <div className="agenda-board">
+        <section className="live-scoreboard" aria-labelledby="live-scoreboard-title" aria-live="polite">
+          <header className="live-scoreboard__header">
+            <div>
+              <span className="live-scoreboard__eyebrow">ACTUALIZACIÓN AUTOMÁTICA</span>
+              <h2 id="live-scoreboard-title">Partidos en vivo</h2>
+            </div>
+            <span className="live-scoreboard__badge"><i aria-hidden="true" /> EN DIRECTO</span>
+          </header>
+          {cargandoEnVivo ? (
+            <p className="live-scoreboard__message">Consultando los marcadores disponibles…</p>
+          ) : partidosEnVivo.length ? (
+            <div className="live-scoreboard__matches">
+              {partidosEnVivo.map((partido, index) => (
+                <article className="live-scoreboard__match" key={`${partido.proveedor || 'partido'}-${partido.id || index}`}>
+                  <span className="live-scoreboard__league">{partido.liga || 'Fútbol'} · {partido.hora || ''}</span>
+                  <div className="live-scoreboard__teams">
+                    <span>{partido.logoLocal && <img src={partido.logoLocal} alt="" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}{partido.local}</span>
+                    <strong>{partido.marcador && partido.marcador !== 'VS' ? partido.marcador : 'EN JUEGO'}</strong>
+                    <span>{partido.logoVisitante && <img src={partido.logoVisitante} alt="" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}{partido.visitante}</span>
+                  </div>
+                  <span className="live-scoreboard__status">{partido.estadoPartido || 'En vivo'}</span>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="live-scoreboard__message">
+              {errorEnVivo && !errorEnVivo.includes('no devolvió partidos')
+                ? 'El marcador en vivo no está disponible en este momento. La agenda sigue mostrando los horarios publicados.'
+                : 'No hay partidos en vivo con datos disponibles en este momento. Revisa la agenda de hoy.'}
+            </p>
+          )}
+          <p className="live-scoreboard__note">La actualización depende de la cobertura y frecuencia del proveedor de cada competición.</p>
+        </section>
+
         <style>{`
           @keyframes liveBeacon {
             0%, 100% { box-shadow: 0 0 0 0 rgba(255, 79, 91, 0.5); }
             50% { box-shadow: 0 0 0 5px rgba(255, 79, 91, 0); }
           }
           .edeargoal-match-row:hover { background: rgba(67, 133, 211, 0.09) !important; }
-          .edeargoal-channel:hover { border-color: #65D99A !important; background: rgba(54,198,119,0.13) !important; }
+          .edeargoal-channel:hover { border-color: #3478F6 !important; background: rgba(52,120,246,0.13) !important; }
         `}</style>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px',
-            padding: '14px 16px',
-            borderBottom: '1px solid rgba(110, 163, 220, 0.16)',
-            background: 'linear-gradient(100deg, rgba(32, 85, 143, 0.22), rgba(13, 23, 39, 0.65) 55%, rgba(16, 39, 36, 0.38))',
-          }}
-        >
+        <div className="agenda-board__header">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-            <span style={{ color: '#65D99A', fontSize: '0.61rem', fontWeight: 900, letterSpacing: '0.16em' }}>EDEARGOAL</span>
+            <span style={{ color: '#91BAFF', fontSize: '0.61rem', fontWeight: 900, letterSpacing: '0.16em' }}>EDEARGOAL</span>
             <span style={{ color: '#F1F6FC', fontSize: '0.88rem', fontWeight: 850, letterSpacing: '0.03em', textTransform: 'uppercase' }}>Agenda deportiva</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px', flexWrap: 'wrap' }}>
+          <div className="agenda-board__toolbar">
             <span style={{ color: '#A8B6C9', fontSize: '0.72rem', fontWeight: 750 }}>
               {agenda.length} {agenda.length === 1 ? 'evento' : 'eventos'}
             </span>
-            <label title="El país se detecta aproximadamente por IP y puedes cambiarlo manualmente." style={{ display: 'flex', alignItems: 'center', gap: '7px', color: '#A8B6C9', fontSize: '0.66rem' }}>
+            <label className="agenda-board__country" title="El país se detecta aproximadamente por IP y puedes cambiarlo manualmente." style={{ display: 'flex', alignItems: 'center', gap: '7px', color: '#A8B6C9', fontSize: '0.66rem' }}>
               <span>Canales de</span>
               <select
                 aria-label="País para canales oficiales"
                 value={pais}
                 onChange={(event) => setPais(event.target.value)}
+                className="agenda-board__country-select"
                 style={{ maxWidth: '155px', border: '1px solid rgba(127,174,217,0.2)', borderRadius: '5px', background: '#0A1420', color: '#EAF3FC', padding: '7px 9px', fontSize: '0.7rem' }}
               >
                 <option value="">Seleccionar país</option>
@@ -119,13 +202,13 @@ export default function PartidosEnVivo({ colBorder, colText, colTextMuted }: Pro
                 {paisesVisitante.map((opcion) => <option key={opcion.code} value={opcion.code}>{opcion.nombre}</option>)}
               </select>
             </label>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '6px 9px', border: '1px solid rgba(101,217,154,0.22)', borderRadius: '20px', background: 'rgba(54,198,119,0.07)', color: '#81DFA9', fontSize: '0.62rem', letterSpacing: '0.09em' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '6px 9px', border: '1px solid rgba(52,120,246,0.24)', borderRadius: '20px', background: 'rgba(52,120,246,0.09)', color: '#91BAFF', fontSize: '0.62rem', letterSpacing: '0.09em' }}>
               HOY
             </span>
           </div>
         </div>
 
-        <div style={{ padding: '11px 16px', borderBottom: '1px solid rgba(110, 163, 220, 0.12)', color: '#A8B6C9', fontSize: '0.72rem', textTransform: 'capitalize' }}>
+        <div className="agenda-board__date" style={{ padding: '11px 16px', borderBottom: '1px solid rgba(110, 163, 220, 0.12)', color: '#A8B6C9', fontSize: '0.72rem', textTransform: 'capitalize' }}>
           {fechaTexto || (cargandoAgenda ? 'Cargando agenda…' : 'Agenda del día')}
         </div>
 
@@ -134,14 +217,14 @@ export default function PartidosEnVivo({ colBorder, colText, colTextMuted }: Pro
             {cargandoAgenda ? 'Cargando partidos del día…' : errorAgenda || 'La agenda de hoy todavía no está disponible.'}
           </div>
         ) : (
-          <div>
+          <div className="agenda-board__events">
             {agenda.map((evento) => {
               const abierto = partidoAbierto === evento.id;
               const canales = pais ? obtenerFuentesOficiales(evento, pais) : [];
               const canalActual = canalActivo?.eventoId === evento.id ? canalActivo.canal : null;
 
               return (
-                <div key={evento.id} style={{ borderTop: '1px solid rgba(255,255,255,0.055)' }}>
+                <div className="agenda-board__event" key={evento.id}>
                   <button
                     className="edeargoal-match-row"
                     type="button"
@@ -159,18 +242,18 @@ export default function PartidosEnVivo({ colBorder, colText, colTextMuted }: Pro
                         <span style={{ color: '#8EC9FF', fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.025em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{evento.liga}</span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, color: colText, fontSize: '0.82rem', fontWeight: 730 }}>
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{evento.local}</span>
-                          <span style={{ flexShrink: 0, color: '#70849A', fontSize: '0.65rem' }}>vs</span>
+                          <span style={{ flexShrink: 0, color: '#70849A', fontSize: '0.65rem' }}>contra</span>
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{evento.visitante}</span>
                         </span>
                       </span>
                     </span>
                     <span aria-hidden="true" style={{ display: 'grid', placeItems: 'center', width: '25px', height: '25px', border: '1px solid rgba(127,174,217,0.18)', borderRadius: '50%', background: 'rgba(255,255,255,0.025)' }}>
-                      <span style={{ width: '7px', height: '7px', borderRight: `1.5px solid ${abierto ? '#65D99A' : '#8295AA'}`, borderBottom: `1.5px solid ${abierto ? '#65D99A' : '#8295AA'}`, transform: abierto ? 'translateY(2px) rotate(225deg)' : 'translateY(-2px) rotate(45deg)', transition: 'transform 160ms ease' }} />
+                      <span style={{ width: '7px', height: '7px', borderRight: `1.5px solid ${abierto ? '#78A9FF' : '#8295AA'}`, borderBottom: `1.5px solid ${abierto ? '#78A9FF' : '#8295AA'}`, transform: abierto ? 'translateY(2px) rotate(225deg)' : 'translateY(-2px) rotate(45deg)', transition: 'transform 160ms ease' }} />
                     </span>
                   </button>
 
                   {abierto && (
-                    <div style={{ padding: '3px 16px 16px 86px', background: 'linear-gradient(90deg, rgba(5,12,20,0.78), rgba(7,17,24,0.56))', borderTop: '1px solid rgba(101,217,154,0.16)' }}>
+                    <div className="agenda-board__event-details" style={{ padding: '3px 16px 16px 86px', background: 'linear-gradient(90deg, rgba(5,12,20,0.78), rgba(7,17,24,0.56))', borderTop: '1px solid rgba(52,120,246,0.18)' }}>
                       <div style={{ padding: '11px 0 9px', color: '#C5D0DC', fontSize: '0.66rem', fontWeight: 850, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
                         Canales y fuentes oficiales · {paisNombre}
                       </div>
@@ -186,10 +269,10 @@ export default function PartidosEnVivo({ colBorder, colText, colTextMuted }: Pro
                               key={canal.id}
                               type="button"
                               onClick={() => setCanalActivo({ eventoId: evento.id, canal })}
-                              style={{ border: `1px solid ${canalActual?.id === canal.id ? '#65D99A' : 'rgba(127,174,217,0.2)'}`, borderRadius: '6px', background: canalActual?.id === canal.id ? 'rgba(54,198,119,0.16)' : 'rgba(255,255,255,0.035)', color: colText, padding: '9px 12px', cursor: 'pointer', fontSize: '0.76rem', fontWeight: 780, transition: 'all 150ms ease' }}
+                              style={{ border: `1px solid ${canalActual?.id === canal.id ? '#3478F6' : 'rgba(127,174,217,0.2)'}`, borderRadius: '6px', background: canalActual?.id === canal.id ? 'rgba(52,120,246,0.16)' : 'rgba(255,255,255,0.035)', color: colText, padding: '9px 12px', cursor: 'pointer', fontSize: '0.76rem', fontWeight: 780, transition: 'all 150ms ease' }}
                               >
                                 <span style={{ display: 'block' }}>{canal.nombre}</span>
-                                <span style={{ display: 'block', marginTop: '3px', color: canal.tipo === 'informacion' ? '#FFCA3A' : '#81DFA9', fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                <span style={{ display: 'block', marginTop: '3px', color: canal.tipo === 'informacion' ? '#FFCA3A' : '#91BAFF', fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                                   {canal.tipo === 'informacion' ? 'Información oficial' : 'Canal oficial'}
                                 </span>
                               </button>
@@ -205,10 +288,10 @@ export default function PartidosEnVivo({ colBorder, colText, colTextMuted }: Pro
                           <div style={{ padding: '12px', background: '#101725', color: colText, fontSize: '0.76rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
                               <span style={{ minWidth: 0, fontWeight: 800 }}>
-                                <span style={{ display: 'block', color: '#65D99A', fontSize: '0.62rem', letterSpacing: '0.12em', marginBottom: '3px' }}>EDEARGOAL · {canalActual.tipo === 'informacion' ? 'FUENTE OFICIAL' : 'CANAL OFICIAL'}</span>
+                                <span style={{ display: 'block', color: '#91BAFF', fontSize: '0.62rem', letterSpacing: '0.12em', marginBottom: '3px' }}>EDEARGOAL · {canalActual.tipo === 'informacion' ? 'FUENTE OFICIAL' : 'CANAL OFICIAL'}</span>
                                 {canalActual.nombre}
                               </span>
-                              <a href={canalActual.url} target="_blank" rel="noopener noreferrer" style={{ borderRadius: '5px', background: '#65D99A', color: '#07120C', padding: '9px 12px', fontSize: '0.7rem', fontWeight: 900, whiteSpace: 'nowrap', textDecoration: 'none' }}>
+                              <a href={canalActual.url} target="_blank" rel="noopener noreferrer" style={{ borderRadius: '5px', background: '#3478F6', color: '#F5F8FF', padding: '9px 12px', fontSize: '0.7rem', fontWeight: 900, whiteSpace: 'nowrap', textDecoration: 'none' }}>
                                 {canalActual.tipo === 'informacion' ? 'VER INFORMACIÓN ↗' : 'ABRIR CANAL ↗'}
                               </a>
                             </div>

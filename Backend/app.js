@@ -116,7 +116,8 @@ function obtenerPartidosCacheadosPorFecha(fecha) {
     if (!clave.endsWith('-jornadas-v6')) continue;
     const datos = leerCachePartidos(clave);
     for (const partido of datos?.partidos || []) {
-      if (String(partido.fechaUtc || partido.fechaISO || '').slice(0, 10) === fecha) {
+      const fechaLocal = formatearFechaISOPeru(partido.fechaUtc) || partido.fechaISO;
+      if (fechaLocal === fecha) {
         partidos.set(String(partido.id), partido);
       }
     }
@@ -283,13 +284,14 @@ const competenciasApiFootball = {
 function traducirEstado(status) {
   if (!status) return "Por Jugar";
   const statusLower = status.toLowerCase();
-  if (statusLower === "finished" || statusLower === "ft") return "Finalizado";
-  if (statusLower === "paused" || statusLower === "ht") return "Entretiempo";
-  if (statusLower === "in_play" || statusLower === "live") return "En Vivo";
-  if (statusLower === "postponed") return "Pospuesto";
-  if (statusLower === "cancelled") return "Cancelado";
-  if (statusLower === "scheduled" || statusLower === "timed") return "Por Jugar";
-  return status;
+  if (["finished", "ft", "aet", "pen", "after extra time", "penalties", "match finished"].includes(statusLower)) return "Finalizado";
+  if (["paused", "ht", "halftime", "half time", "break"].includes(statusLower)) return "Entretiempo";
+  if (["in_play", "in play", "in progress", "live", "1h", "2h", "first half", "second half", "et", "p", "bt"].includes(statusLower)) return "En Vivo";
+  if (["postponed", "pst"].includes(statusLower)) return "Aplazado";
+  if (["cancelled", "canceled", "canc"].includes(statusLower)) return "Cancelado";
+  if (["abandoned", "abd", "suspended", "interrupted", "int"].includes(statusLower)) return "Suspendido";
+  if (["scheduled", "timed", "not started", "ns", "tbd"].includes(statusLower)) return "Por Jugar";
+  return "Estado no disponible";
 }
 
 function normalizarNombreClub(nombre) {
@@ -472,15 +474,16 @@ async function obtenerLineupsDesdeSofascore(partido) {
 
 function partidoFinalizado(status, golesLocal, golesVisitante) {
   const estado = String(status || '').toLowerCase();
-  return ['finished', 'ft', 'aet', 'pen', 'finalizado'].includes(estado) ||
-    (golesLocal !== null && golesLocal !== undefined && golesVisitante !== null && golesVisitante !== undefined);
+  if (['1h', '2h', 'ht', 'et', 'p', 'live', 'in_play', 'paused', 'int', 'bt', 'suspended', 'interrupted'].includes(estado)) return false;
+  if (['finished', 'ft', 'aet', 'pen', 'finalizado'].includes(estado)) return true;
+  return golesLocal !== null && golesLocal !== undefined && golesVisitante !== null && golesVisitante !== undefined;
 }
 
 function formatearFechaEspanol(utcDate) {
   if (!utcDate) return "";
   const fechaObj = new Date(utcDate);
   if (isNaN(fechaObj.getTime())) return "";
-  const opciones = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+  const opciones = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Lima' };
   let fechaFormateada = fechaObj.toLocaleDateString('es-ES', opciones);
   return fechaFormateada.charAt(0).toUpperCase() + fechaFormateada.slice(1);
 }
@@ -489,7 +492,21 @@ function formatearHora(utcDate) {
   if (!utcDate) return "";
   const fechaObj = new Date(utcDate);
   if (isNaN(fechaObj.getTime())) return "";
-  return fechaObj.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + " hs";
+  return fechaObj.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' }) + " hs";
+}
+
+function formatearFechaISOPeru(utcDate) {
+  if (!utcDate) return '';
+  const fechaObj = new Date(utcDate);
+  if (isNaN(fechaObj.getTime())) return '';
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: 'America/Lima'
+  }).formatToParts(fechaObj);
+  const valores = Object.fromEntries(partes.map((parte) => [parte.type, parte.value]));
+  return `${valores.year}-${valores.month}-${valores.day}`;
 }
 
 function normalizarPartidoFootballData(partido, competencia) {
@@ -511,7 +528,7 @@ function normalizarPartidoFootballData(partido, competencia) {
     marcador,
     jornada: partido.matchday || null,
     finalizado: partidoFinalizado(partido.status, homeScore, awayScore),
-    fechaISO: partido.utcDate?.slice(0, 10),
+    fechaISO: formatearFechaISOPeru(partido.utcDate),
     fechaUtc: partido.utcDate,
     proveedor: 'football-data',
     fechaTexto: formatearFechaEspanol(partido.utcDate),
@@ -571,7 +588,7 @@ async function obtenerPartidosPorFecha(fecha, apiFootballKey, apiKeyFootballData
     try {
       const response = await axios.get('https://v3.football.api-sports.io/fixtures', {
         headers: { 'x-apisports-key': apiFootballKey },
-        params: { date: fecha }
+        params: { date: fecha, timezone: 'America/Lima' }
       });
       if (response.data?.errors && Object.keys(response.data.errors).length > 0) {
         throw new Error(JSON.stringify(response.data.errors));
@@ -655,7 +672,7 @@ function normalizarPartidoApiFootball(partido) {
     logoVisitante: partido.teams?.away?.logo || "",
     marcador: tieneMarcador ? `${golesLocal} - ${golesVisitante}` : "VS",
     finalizado: partidoFinalizado(partido.fixture?.status?.short, golesLocal, golesVisitante),
-    fechaISO: partido.fixture?.date?.slice(0, 10),
+    fechaISO: formatearFechaISOPeru(partido.fixture?.date),
     fechaUtc: partido.fixture?.date,
     proveedor: 'api-football',
     fechaTexto: formatearFechaEspanol(partido.fixture?.date),
@@ -1363,8 +1380,8 @@ app.get('/api/partidos', limitarSolicitudes, async (req, res) => {
       }
 
       const consultaCalendario = req.query.fecha !== undefined;
-      const claveCalendario = `calendario-v3-${fecha}`;
-      const partidosGuardados = leerCache(claveCalendario, DURACION_CACHE.partidos);
+      const claveCalendario = `calendario-v4-${fecha}`;
+      const partidosGuardados = leerCachePartidos(claveCalendario);
       if (partidosGuardados) return res.json(consultaCalendario ? partidosGuardados : partidosGuardados.partidos);
 
       const resultado = await obtenerPartidosPorFecha(

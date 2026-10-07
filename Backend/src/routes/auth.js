@@ -35,44 +35,26 @@ function opcionesCookie() {
 function responderError(res, error) {
   const estado = error.estado || 500;
   if (estado >= 500) console.error('Error de autenticación:', error.message);
-  const configuracionVisible = ['EMAIL_NOT_CONFIGURED', 'EMAIL_CONFIG_INVALID', 'AUTH_CONFIG_MISSING'].includes(error.codigo);
   return res.status(estado).json({
     error: error.codigo || 'AUTH_ERROR',
-    mensaje: estado >= 500 && !configuracionVisible
+    mensaje: estado >= 500 && error.codigo !== 'AUTH_CONFIG_MISSING'
       ? 'No se pudo completar la operación. Revisa la configuración del backend.'
-      : error.codigo === 'EMAIL_NOT_CONFIGURED'
-        ? 'No pudimos enviarte el código ahora. Inténtalo de nuevo más tarde.'
       : error.message
   });
 }
 
 router.post('/registro', limitarAuth, async (req, res) => {
   try {
-    const resultado = await authService.registrarCuenta(req.body?.nombre, req.body?.correo, req.body?.contrasena);
-    return res.status(202).json(resultado);
-  } catch (error) {
-    return responderError(res, error);
-  }
-});
-
-router.post('/verificar-correo', limitarAuth, async (req, res) => {
-  try {
-    const resultado = await authService.verificarCuenta(req.body?.correo, req.body?.codigo);
+    const resultado = await authService.registrarCuenta(
+      req.body?.nombre,
+      req.body?.apodo,
+      req.body?.equipoFavorito,
+      req.body?.aceptoCondiciones,
+      req.body?.correo,
+      req.body?.contrasena
+    );
     res.cookie(nombreCookieSesion, resultado.tokenSesion, opcionesCookie());
-    return res.json({
-      usuario: resultado.usuario,
-      mensaje: '¡Felicidades! Tu cuenta de EdearGoal está activa.',
-      correoBienvenidaEnviado: resultado.correoBienvenidaEnviado
-    });
-  } catch (error) {
-    return responderError(res, error);
-  }
-});
-
-router.post('/reenviar-verificacion', limitarAuth, async (req, res) => {
-  try {
-    const resultado = await authService.reenviarVerificacion(req.body?.correo);
-    return res.json(resultado);
+    return res.status(201).json({ usuario: resultado.usuario });
   } catch (error) {
     return responderError(res, error);
   }

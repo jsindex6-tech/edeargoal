@@ -1,5 +1,47 @@
 import { useState, type FormEvent } from 'react';
 import { apiUrl } from '../services/api';
+import type { UsuarioCuenta } from '../types';
+
+interface RespuestaAuth {
+  error?: string;
+  mensaje?: string;
+  usuario?: UsuarioCuenta;
+}
+
+async function leerRespuestaAuth(respuesta: Response): Promise<RespuestaAuth> {
+  const texto = await respuesta.text();
+  if (!texto) return {};
+
+  try {
+    const datos: unknown = JSON.parse(texto);
+    if (typeof datos !== 'object' || datos === null) return {};
+    const objeto = datos as Record<string, unknown>;
+    const usuario = typeof objeto.usuario === 'object' && objeto.usuario !== null
+      ? objeto.usuario as Record<string, unknown>
+      : undefined;
+    const correoUsuario = typeof usuario?.correo === 'string' ? usuario.correo : undefined;
+    const nombreUsuario = typeof usuario?.nombre === 'string' ? usuario.nombre : '';
+    return {
+      error: typeof objeto.error === 'string' ? objeto.error : undefined,
+      mensaje: typeof objeto.mensaje === 'string' ? objeto.mensaje : undefined,
+      usuario: correoUsuario ? {
+        nombre: nombreUsuario,
+        apodo: typeof usuario?.apodo === 'string' ? usuario.apodo : nombreUsuario || correoUsuario,
+        correo: correoUsuario,
+        equipoFavorito: typeof usuario?.equipoFavorito === 'string' ? usuario.equipoFavorito : '',
+        fechaUnion: typeof usuario?.fechaUnion === 'string' ? usuario.fechaUnion : '',
+        condicionesAceptadasEn: typeof usuario?.condicionesAceptadasEn === 'string' ? usuario.condicionesAceptadasEn : null,
+        versionCondiciones: typeof usuario?.versionCondiciones === 'string' ? usuario.versionCondiciones : null
+      } : undefined
+    };
+  } catch {
+    return {
+      mensaje: respuesta.ok
+        ? 'El servicio de cuentas respondió con un formato inesperado.'
+        : 'El servicio de cuentas no está disponible. Inténtalo más tarde.'
+    };
+  }
+}
 
 interface ModalLoginProps {
   abierto: boolean;
@@ -8,7 +50,7 @@ interface ModalLoginProps {
   colBorder: string;
   colText: string;
   temaActual: 'oscuro' | 'claro' | 'neon';
-  onSesionIniciada: (correo: string) => void;
+  onSesionIniciada: (usuario: UsuarioCuenta) => void;
 }
 
 export default function ModalLogin({
@@ -20,14 +62,15 @@ export default function ModalLogin({
   temaActual,
   onSesionIniciada
 }: ModalLoginProps) {
-  const [vista, setVista] = useState<'inicio' | 'ingresar' | 'registrar' | 'pendiente' | 'confirmada'>('inicio');
+  const [vista, setVista] = useState<'inicio' | 'ingresar' | 'registrar'>('inicio');
   const [nombre, setNombre] = useState('');
+  const [apodo, setApodo] = useState('');
   const [correo, setCorreo] = useState('');
-  const [codigo, setCodigo] = useState('');
+  const [equipoFavorito, setEquipoFavorito] = useState('');
   const [contrasena, setContrasena] = useState('');
   const [confirmacion, setConfirmacion] = useState('');
+  const [aceptoCondiciones, setAceptoCondiciones] = useState(false);
   const [mensaje, setMensaje] = useState('');
-  const [correoEnviado, setCorreoEnviado] = useState<boolean | null>(null);
   const [cargando, setCargando] = useState(false);
 
   if (!abierto) return null;
@@ -35,37 +78,14 @@ export default function ModalLogin({
   const cerrar = () => {
     setVista('inicio');
     setNombre('');
+    setApodo('');
     setCorreo('');
-    setCodigo('');
+    setEquipoFavorito('');
     setContrasena('');
     setConfirmacion('');
+    setAceptoCondiciones(false);
     setMensaje('');
-    setCorreoEnviado(null);
     onCerrar();
-  };
-
-  const confirmarCodigo = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setMensaje('');
-    setCargando(true);
-    try {
-      const respuesta = await fetch(apiUrl('/api/auth/verificar-correo'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ correo, codigo })
-      });
-      const datos = await respuesta.json();
-      if (!respuesta.ok) throw new Error(datos.mensaje || 'No se pudo verificar el código.');
-      onSesionIniciada(datos.usuario.correo);
-      setCorreoEnviado(true);
-      setMensaje(datos.mensaje || '¡Felicidades! Tu cuenta está activa.');
-      setVista('confirmada');
-    } catch (fallo) {
-      setMensaje(fallo instanceof Error ? fallo.message : 'No se pudo verificar el código.');
-    } finally {
-      setCargando(false);
-    }
   };
 
   const enviarFormulario = async (event: FormEvent<HTMLFormElement>) => {
@@ -83,49 +103,27 @@ export default function ModalLogin({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ nombre, correo, contrasena })
+        body: JSON.stringify({
+          nombre,
+          apodo,
+          equipoFavorito,
+          aceptoCondiciones,
+          correo,
+          contrasena
+        })
       });
-      const datos = await respuesta.json();
+      const datos = await leerRespuestaAuth(respuesta);
       if (!respuesta.ok) {
-        if (datos.error === 'EMAIL_NOT_VERIFIED') {
-          setVista('pendiente');
-          setCorreoEnviado(false);
-        }
         throw new Error(datos.mensaje || 'No se pudo completar la solicitud.');
       }
 
-      if (vista === 'registrar') {
-        setVista('pendiente');
-        setCorreoEnviado(Boolean(datos.correoEnviado));
-        setMensaje(datos.mensaje || 'Revisa tu correo para activar la cuenta.');
-      } else {
-        onSesionIniciada(datos.usuario.correo);
-        cerrar();
-      }
+      if (!datos.usuario?.correo) throw new Error('El servidor no confirmó la sesión. Inténtalo de nuevo.');
+      onSesionIniciada(datos.usuario);
+      cerrar();
     } catch (fallo) {
-      setMensaje(fallo instanceof Error ? fallo.message : 'No se pudo conectar con el servicio de cuentas.');
-    } finally {
-      setCargando(false);
-    }
-  };
-
-  const reenviarVerificacion = async () => {
-    setCargando(true);
-    setMensaje('');
-    try {
-      const respuesta = await fetch(apiUrl('/api/auth/reenviar-verificacion'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ correo })
-      });
-      const datos = await respuesta.json();
-      if (!respuesta.ok) throw new Error(datos.mensaje || 'No se pudo reenviar el correo.');
-      setCorreoEnviado(Boolean(datos.correoEnviado));
-      setMensaje(datos.mensaje);
-    } catch (fallo) {
-      setCorreoEnviado(false);
-      setMensaje(fallo instanceof Error ? fallo.message : 'No se pudo enviar el correo.');
+      setMensaje(fallo instanceof TypeError
+        ? 'No se pudo conectar con el servicio de cuentas. Puede estar temporalmente fuera de servicio.'
+        : fallo instanceof Error ? fallo.message : 'No se pudo conectar con el servicio de cuentas.');
     } finally {
       setCargando(false);
     }
@@ -135,10 +133,23 @@ export default function ModalLogin({
     <div className="auth-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) cerrar(); }}>
       <section className={`auth-dialog auth-dialog--${temaActual}`} role="dialog" aria-modal="true" aria-labelledby="auth-title" style={{ background: colCard, borderColor: colBorder, color: colText }}>
         <div className="auth-dialog__topline">
-          <span className="auth-dialog__brand">EDEARGOAL <span>CUENTA</span></span>
+          <span className="auth-dialog__brand"><span className="auth-dialog__brand-mark">EG</span>EDEARGOAL <span>CUENTA</span></span>
           <button className="auth-dialog__close" type="button" onClick={cerrar} aria-label="Cerrar">×</button>
         </div>
 
+        <div className="auth-dialog__body">
+          <aside className="auth-dialog__intro">
+            <span className="auth-dialog__intro-tag">TU PARTIDO. TU PASIÓN.</span>
+            <h2>Vive el fútbol desde un solo lugar.</h2>
+            <p>Entra a EdearGoal para seguir tus competiciones y consultar la información disponible de cada encuentro.</p>
+            <ul>
+              <li>Resultados y calendario por liga</li>
+              <li>Clubes, estadísticas y comparativas</li>
+              <li>Tu cuenta protegida con sesión segura</li>
+            </ul>
+            <span className="auth-dialog__intro-caption">EDEARGOAL · FÚTBOL EN SEGUIMIENTO</span>
+          </aside>
+          <div className="auth-dialog__panel">
         {vista === 'inicio' && (
           <div className="auth-dialog__content">
             <span className="auth-dialog__eyebrow">TU ESPACIO DE FÚTBOL</span>
@@ -160,10 +171,22 @@ export default function ModalLogin({
                 <input autoComplete="name" value={nombre} onChange={(event) => setNombre(event.target.value)} required maxLength={80} />
               </label>
             )}
+            {vista === 'registrar' && (
+              <label className="auth-dialog__field">
+                <span>Apodo</span>
+                <input autoComplete="nickname" value={apodo} onChange={(event) => setApodo(event.target.value)} required minLength={2} maxLength={30} />
+              </label>
+            )}
             <label className="auth-dialog__field">
               <span>Correo electrónico</span>
               <input type="email" autoComplete="email" value={correo} onChange={(event) => setCorreo(event.target.value)} required maxLength={254} />
             </label>
+            {vista === 'registrar' && (
+              <label className="auth-dialog__field">
+                <span>Equipo favorito</span>
+                <input value={equipoFavorito} onChange={(event) => setEquipoFavorito(event.target.value)} required minLength={2} maxLength={80} placeholder="Ej. Alianza Lima" />
+              </label>
+            )}
             <label className="auth-dialog__field">
               <span>Contraseña</span>
               <input type="password" autoComplete={vista === 'registrar' ? 'new-password' : 'current-password'} value={contrasena} onChange={(event) => setContrasena(event.target.value)} required minLength={8} maxLength={128} />
@@ -174,11 +197,21 @@ export default function ModalLogin({
                   <span>Repite la contraseña</span>
                   <input type="password" autoComplete="new-password" value={confirmacion} onChange={(event) => setConfirmacion(event.target.value)} required minLength={8} maxLength={128} />
                 </label>
-                <p className="auth-dialog__hint">Usa al menos 8 caracteres. Te enviaremos un código de 6 dígitos al correo.</p>
+                <p className="auth-dialog__hint">Usa al menos 8 caracteres. Al crear tu cuenta, podrás ingresar de inmediato.</p>
+                <details className="auth-dialog__terms">
+                  <summary>Leer Condiciones de uso y Privacidad</summary>
+                  <p>EdearGoal es un proyecto independiente. Los datos deportivos pueden tener retrasos o errores; verifica la información importante con las fuentes oficiales. Usa el sitio de forma lícita y respeta los derechos de terceros.</p>
+                  <p>Guardamos tu nombre, correo, apodo, equipo favorito, fecha de registro y aceptación de estas condiciones. La contraseña se almacena como hash y usamos una cookie para mantener tu sesión. No verificamos que tengas acceso al correo que registras. Puedes solicitar acceso, corrección o eliminación de tus datos escribiendo a edeargoal@gmail.com desde el correo de la cuenta.</p>
+                  <p>Al continuar, confirmas que leíste y aceptas estas condiciones y la política de privacidad.</p>
+                </details>
+                <label className="auth-dialog__consent">
+                  <input type="checkbox" checked={aceptoCondiciones} onChange={(event) => setAceptoCondiciones(event.target.checked)} required />
+                  <span>Acepto las Condiciones de uso y la Política de privacidad.</span>
+                </label>
               </>
             )}
             {mensaje && <p className="auth-dialog__notice" role="alert">{mensaje}</p>}
-            <button className="auth-dialog__primary" type="submit" disabled={cargando}>
+            <button className="auth-dialog__primary" type="submit" disabled={cargando || (vista === 'registrar' && !aceptoCondiciones)}>
               {cargando ? 'Procesando…' : vista === 'registrar' ? 'Crear cuenta' : 'Entrar'}
             </button>
             <button className="auth-dialog__text-button" type="button" onClick={() => { setVista(vista === 'registrar' ? 'ingresar' : 'inicio'); setMensaje(''); }}>
@@ -187,43 +220,11 @@ export default function ModalLogin({
           </form>
         )}
 
-        {vista === 'pendiente' && (
-          <div className="auth-dialog__content">
-            <span className="auth-dialog__eyebrow">UN PASO MÁS</span>
-            <h2 id="auth-title">{correoEnviado === false ? 'Cuenta creada' : 'Ingresa el código'}</h2>
-            <p>{correoEnviado === false
-              ? <>Tu cuenta quedó registrada con <strong>{correo}</strong>, pero sigue pendiente de verificación. Confirma el correo antes de iniciar sesión.</>
-              : <>Escribe el código de 6 dígitos que enviamos a <strong>{correo}</strong>. Vence en 10 minutos.</>}</p>
-            {correoEnviado && (
-              <form className="auth-dialog__otp-form" onSubmit={confirmarCodigo}>
-                <label className="auth-dialog__field">
-                  <span>Código de verificación</span>
-                  <input className="auth-dialog__otp-input" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={codigo} onChange={(event) => setCodigo(event.target.value.replace(/\D/g, '').slice(0, 6))} required aria-label="Código de 6 dígitos" />
-                </label>
-                {mensaje && <p className="auth-dialog__notice" role="alert">{mensaje}</p>}
-                <button className="auth-dialog__primary" type="submit" disabled={cargando || codigo.length !== 6}>
-                  {cargando ? 'Verificando…' : 'Verificar y activar cuenta'}
-                </button>
-              </form>
-            )}
-            {!correoEnviado && mensaje && <p className="auth-dialog__notice auth-dialog__notice--warning" role="status">{mensaje}</p>}
-            <button className="auth-dialog__primary" type="button" onClick={() => void reenviarVerificacion()} disabled={cargando}>
-              {cargando ? 'Enviando…' : correoEnviado === false ? 'Intentar enviar código' : 'Reenviar código'}
-            </button>
-            <button className="auth-dialog__text-button" type="button" onClick={() => { setVista('ingresar'); setMensaje(''); }}>Volver a iniciar sesión</button>
+            <div className="auth-dialog__footer">
+              Puedes revisar Condiciones de uso y Privacidad en el pie de página. No compartas tu contraseña.
+            </div>
           </div>
-        )}
-
-        {vista === 'confirmada' && (
-          <div className="auth-dialog__content">
-            <span className="auth-dialog__eyebrow">CORREO VERIFICADO</span>
-            <h2 id="auth-title">¡Cuenta activa!</h2>
-            <p>{mensaje || '¡Felicidades! Te registraste con éxito en EdearGoal.'}</p>
-            <button className="auth-dialog__primary" type="button" onClick={cerrar}>Entrar a EdearGoal</button>
-          </div>
-        )}
-
-        <div className="auth-dialog__footer">Tu correo se usa para proteger el acceso a tu cuenta.</div>
+        </div>
       </section>
     </div>
   );

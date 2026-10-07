@@ -10,25 +10,27 @@ const documentos: Record<DocumentoLegal, { titulo: string; contenido: string[] }
 	condiciones: {
 		titulo: 'Condiciones de uso',
 		contenido: [
-			'EdearGoal ofrece información deportiva con fines informativos y de entretenimiento. Los horarios, resultados, estadísticas y alineaciones pueden cambiar o contener errores; confirma los datos importantes con sus fuentes.',
-			'Al usar el sitio, acepta no interferir con su funcionamiento ni utilizarlo para actividades ilícitas. El acceso puede interrumpirse o cambiar sin previo aviso.',
-			'Los nombres, escudos, fotografías y demás materiales pertenecen a sus respectivos titulares. EdearGoal no implica afiliación oficial con clubes, ligas ni proveedores de datos.'
+			'Última actualización: 7 de octubre de 2026. EdearGoal es un proyecto independiente para consultar información de fútbol. No es un organismo oficial ni representa a ligas, clubes, federaciones o proveedores de datos.',
+			'Los calendarios, marcadores, tablas y estadísticas dependen de fuentes externas y pueden tener retrasos, errores o cobertura limitada. Comprueba la información importante con el organizador o la fuente oficial.',
+			'Usa el sitio de forma lícita y respeta la seguridad del servicio y los derechos de terceros. Los nombres, escudos, marcas e imágenes pertenecen a sus respectivos titulares y se muestran para identificar equipos y competiciones.',
+			'Si tienes consultas sobre estas condiciones, escríbenos a edeargoal@gmail.com.'
 		]
 	},
 	privacidad: {
 		titulo: 'Política de privacidad',
 		contenido: [
-			'Las cuentas se almacenan en el servidor con la contraseña protegida mediante un hash; la contraseña original no se guarda. El correo se utiliza para verificar la cuenta y la sesión se mantiene en una cookie HttpOnly.',
-			'El envío de mensajes de verificación y bienvenida se procesa mediante el proveedor SMTP configurado por EdearGoal. El sitio también consulta servicios externos de datos deportivos, que pueden recibir datos técnicos de conexión conforme a sus propias políticas.',
-			'El responsable debe configurar plazos de conservación, canal de contacto y las medidas exigidas por la legislación aplicable antes del lanzamiento público.'
+		'Última actualización: 7 de octubre de 2026. Para crear una cuenta se solicita nombre, apodo, equipo favorito, correo y contraseña. También se guarda la fecha de registro y la fecha y versión de las condiciones aceptadas. La contraseña se almacena como hash; el correo se usa para gestionar el inicio de sesión.',
+			'El sitio utiliza una cookie de sesión y aplica límites técnicos para proteger el servicio. Los proveedores de alojamiento y de datos deportivos pueden procesar información técnica necesaria para responder a las solicitudes, de acuerdo con sus propias políticas.',
+		'El registro no verifica que controles el correo que escribes. Puedes solicitar acceso, corrección o eliminación de los datos de tu cuenta escribiendo a edeargoal@gmail.com desde el correo asociado. No envíes tu contraseña por correo.'
 		]
 	},
 	aviso: {
 		titulo: 'Aviso legal',
 		contenido: [
-			'EdearGoal es un sitio independiente de información deportiva y no representa a FIFA, confederaciones, ligas, clubes ni proveedores de datos.',
-			'La información se presenta tal como la proporcionan sus fuentes y no constituye asesoramiento oficial. Los derechos sobre marcas, imágenes y datos corresponden a sus titulares.',
-			'La identificación del titular del sitio y sus datos de contacto deben añadirse aquí antes de publicar esta sección como aviso legal definitivo.'
+			'Última actualización: 7 de octubre de 2026. EdearGoal es independiente y no está afiliado a FIFA, confederaciones, federaciones, ligas, clubes ni proveedores de datos.',
+			'Los resultados, escudos, nombres y demás datos deportivos pueden ser suministrados por terceros. Sus marcas y contenidos pertenecen a sus respectivos titulares; la cobertura y actualización pueden variar.',
+			'EdearGoal no transmite partidos. Los enlaces externos llevan a sitios de terceros, cuyo contenido y políticas son responsabilidad de quienes los gestionan.',
+			'Para consultas sobre el sitio o sus contenidos, escribe a edeargoal@gmail.com.'
 		]
 	}
 };
@@ -44,10 +46,10 @@ export default function Footer({ temaActual }: FooterProps) {
 			<footer className={`site-footer${esClaro ? ' site-footer--light' : ''}`}>
 				<div className="site-footer__main">
 					<button className="site-footer__about" type="button" onClick={() => setSobreAbierto(true)}>
-						<img src="./edeargoal.jpg" alt="" />
+						<span className="site-footer__about-mark" aria-hidden="true">EG</span>
 						<span>
 							<strong>Sobre EdearGoal</strong>
-							<small>Fútbol, resultados y seguimiento</small>
+							<small>Qué es y cómo consultar los datos</small>
 						</span>
 						<span className="site-footer__about-arrow" aria-hidden="true">↗</span>
 					</button>
@@ -73,25 +75,17 @@ export default function Footer({ temaActual }: FooterProps) {
 							<span>CONOCE LA PLATAFORMA</span>
 							<button type="button" aria-label="Cerrar" onClick={() => setSobreAbierto(false)}>×</button>
 						</header>
-						<div className="about-dialog__layout">
-							<div className="about-dialog__visual">
-								<img className="about-dialog__stadium" src="./estadio-azul.jpeg" alt="Estadio de fútbol iluminado durante un partido" />
-								<div className="about-dialog__brand">
-									<img src="./edeargoal.jpg" alt="EdearGoal" />
-									<span>Fútbol en seguimiento</span>
-								</div>
+						<div className="about-dialog__copy">
+							<span className="about-dialog__eyebrow">FÚTBOL, DATOS Y COMPETICIONES</span>
+							<h2 id="about-dialog-title">EdearGoal reúne el fútbol que sigues</h2>
+							<p>EdearGoal es un sitio independiente creado para explorar calendarios y resultados de fútbol con una navegación sencilla. Selecciona una competición para consultar sus partidos y abre un equipo o encuentro para ver más información disponible.</p>
+							<div className="about-dialog__sections">
+								<section><h3>Qué puedes consultar</h3><p>Agenda del día, partidos y fechas de cada competición, marcadores, resultados, tablas cuando el formato las admite, equipos, fichas de clubes y enfrentamientos directos.</p></section>
+								<section><h3>Partidos en vivo</h3><p>El estado y marcador en vivo aparecen cuando el proveedor publica actualizaciones. Puede existir demora, y no todas las ligas tienen la misma cobertura. EdearGoal no aloja ni transmite partidos.</p></section>
+								<section><h3>Cómo leer los datos</h3><p>Las fechas y horas se muestran para Perú. Las tablas se presentan solo cuando hay datos de clasificación fiables; en torneos por grupos o eliminación se avisa si no existe una tabla general comparable.</p></section>
+								<section><h3>Transparencia y contacto</h3><p>EdearGoal no está afiliado oficialmente con equipos, ligas o federaciones. Los datos y marcas pertenecen a sus titulares. Escríbenos a <a href="mailto:edeargoal@gmail.com">edeargoal@gmail.com</a> para consultas o correcciones.</p></section>
 							</div>
-							<div className="about-dialog__copy">
-								<h2 id="about-dialog-title">EdearGoal, partido a partido</h2>
-								<p>Consulta la actividad del fútbol y explora los datos de tus competiciones y equipos desde un mismo lugar.</p>
-								<ul>
-									<li><strong>Agenda</strong><span>Partidos del día y encuentros en vivo.</span></li>
-									<li><strong>Competiciones</strong><span>Calendarios, tablas, clubes e historial disponible.</span></li>
-									<li><strong>Detalle del partido</strong><span>Marcador, eventos y alineaciones cuando el proveedor las publica.</span></li>
-									<li><strong>Cara a cara</strong><span>Compara los enfrentamientos registrados entre equipos.</span></li>
-								</ul>
-								<p className="about-dialog__note">Los datos pueden variar según la cobertura de cada proveedor deportivo.</p>
-							</div>
+							<p className="about-dialog__note">La cobertura depende de las fuentes deportivas conectadas y puede cambiar por temporada, competición o disponibilidad del proveedor.</p>
 						</div>
 					</section>
 				</div>
@@ -108,6 +102,7 @@ export default function Footer({ temaActual }: FooterProps) {
 						</div>
 						<div className="legal-dialog__content">
 							{documento.contenido.map((parrafo) => <p key={parrafo}>{parrafo}</p>)}
+							<a className="legal-dialog__contact" href="mailto:edeargoal@gmail.com">Contactar: edeargoal@gmail.com</a>
 						</div>
 					</section>
 				</div>

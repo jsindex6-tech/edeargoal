@@ -17,19 +17,19 @@ export default function VistaLiga({ ligaSeleccionada }: Props) {
       <div style={{ display: 'flex', justifyContent: 'center', gap: '30px', borderBottom: '1px solid #1E2338', paddingBottom: '12px', marginBottom: '15px', fontSize: '0.95rem', fontWeight: 'bold' }}>
         <span 
           onClick={() => setPestanaActiva('tablas')} 
-          style={{ cursor: 'pointer', color: pestanaActiva === 'tablas' ? '#FFD700' : '#A0A5B5', borderBottom: pestanaActiva === 'tablas' ? '2px solid #FFD700' : 'none', paddingBottom: '10px' }}
+          style={{ cursor: 'pointer', color: pestanaActiva === 'tablas' ? '#78A9FF' : '#A0A5B5', borderBottom: pestanaActiva === 'tablas' ? '2px solid #78A9FF' : 'none', paddingBottom: '10px' }}
         >
           TABLAS
         </span>
         <span 
           onClick={() => setPestanaActiva('equipos')} 
-          style={{ cursor: 'pointer', color: pestanaActiva === 'equipos' ? '#FFD700' : '#A0A5B5', borderBottom: pestanaActiva === 'equipos' ? '2px solid #FFD700' : 'none', paddingBottom: '10px' }}
+          style={{ cursor: 'pointer', color: pestanaActiva === 'equipos' ? '#78A9FF' : '#A0A5B5', borderBottom: pestanaActiva === 'equipos' ? '2px solid #78A9FF' : 'none', paddingBottom: '10px' }}
         >
           EQUIPOS
         </span>
         <span 
           onClick={() => setPestanaActiva('campeones')} 
-          style={{ cursor: 'pointer', color: pestanaActiva === 'campeones' ? '#FFD700' : '#A0A5B5', borderBottom: pestanaActiva === 'campeones' ? '2px solid #FFD700' : 'none', paddingBottom: '10px' }}
+          style={{ cursor: 'pointer', color: pestanaActiva === 'campeones' ? '#78A9FF' : '#A0A5B5', borderBottom: pestanaActiva === 'campeones' ? '2px solid #78A9FF' : 'none', paddingBottom: '10px' }}
         >
           CAMPEONES
         </span>
@@ -39,14 +39,14 @@ export default function VistaLiga({ ligaSeleccionada }: Props) {
         <div>
           <div style={{ display: 'flex', gap: '25px', marginBottom: '15px', fontSize: '0.85rem', color: '#A0A5B5' }}>
             <span onClick={() => setSubPestanaTabla('apertura')} style={{ cursor: 'pointer', color: subPestanaTabla === 'apertura' ? '#FFF' : '#A0A5B5' }}>APERTURA</span>
-            <span onClick={() => setSubPestanaTabla('clausura')} style={{ cursor: 'pointer', color: subPestanaTabla === 'clausura' ? '#FFD700' : '#A0A5B5', borderBottom: subPestanaTabla === 'clausura' ? '2px solid #FFD700' : 'none' }}>CLAUSURA •</span>
+            <span onClick={() => setSubPestanaTabla('clausura')} style={{ cursor: 'pointer', color: subPestanaTabla === 'clausura' ? '#78A9FF' : '#A0A5B5', borderBottom: subPestanaTabla === 'clausura' ? '2px solid #78A9FF' : 'none' }}>CLAUSURA •</span>
             <span onClick={() => setSubPestanaTabla('anual')} style={{ cursor: 'pointer', color: subPestanaTabla === 'anual' ? '#FFF' : '#A0A5B5' }}>TABLA ANUAL •</span>
             <span onClick={() => setSubPestanaTabla('promedios')} style={{ cursor: 'pointer', color: subPestanaTabla === 'promedios' ? '#FFF' : '#A0A5B5' }}>PROMEDIOS</span>
           </div>
 
           <div style={{ display: 'flex', backgroundColor: '#0B0D17', borderRadius: '6px', padding: '4px', marginBottom: '15px', textAlign: 'center' }}>
-            <div onClick={() => setGrupoTabla('grupoA')} style={{ flex: 1, padding: '8px', cursor: 'pointer', backgroundColor: grupoTabla === 'grupoA' ? '#1E2338' : 'transparent', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold', color: grupoTabla === 'grupoA' ? '#FFD700' : '#A0A5B5' }}>GRUPO A</div>
-            <div onClick={() => setGrupoTabla('grupoB')} style={{ flex: 1, padding: '8px', cursor: 'pointer', backgroundColor: grupoTabla === 'grupoB' ? '#1E2338' : 'transparent', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold', color: grupoTabla === 'grupoB' ? '#FFD700' : '#A0A5B5' }}>GRUPO B •</div>
+            <div onClick={() => setGrupoTabla('grupoA')} style={{ flex: 1, padding: '8px', cursor: 'pointer', backgroundColor: grupoTabla === 'grupoA' ? '#1E2338' : 'transparent', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold', color: grupoTabla === 'grupoA' ? '#78A9FF' : '#A0A5B5' }}>GRUPO A</div>
+            <div onClick={() => setGrupoTabla('grupoB')} style={{ flex: 1, padding: '8px', cursor: 'pointer', backgroundColor: grupoTabla === 'grupoB' ? '#1E2338' : 'transparent', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold', color: grupoTabla === 'grupoB' ? '#78A9FF' : '#A0A5B5' }}>GRUPO B •</div>
           </div>
 
           <div style={{ overflowX: 'auto' }}>

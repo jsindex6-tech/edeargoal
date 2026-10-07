@@ -10,32 +10,14 @@ process.env.AUTH_SESSION_SECRET ||= 'auth-tests-only-secret';
 const {
   hashPassword,
   verificarPassword,
-  crearCodigoVerificacion,
-  hashCodigoVerificacion,
   crearTokenSesion,
   verificarTokenSesion,
   registrarCuenta,
-  verificarCuenta
+  iniciarSesion,
+  obtenerUsuarioDeSesion
 } = require('./authService');
 
 test.after(() => fs.rmSync(directorioTemporal, { recursive: true, force: true }));
-
-async function guardarCuentaOtp(correo, codigo, venceEn) {
-  const cuentas = JSON.parse(fs.readFileSync(process.env.AUTH_ACCOUNTS_FILE, 'utf8'));
-  const sal = `sal-${correo}`;
-  cuentas[correo] = {
-    nombre: 'Cuenta OTP',
-    correo,
-    passwordHash: await hashPassword('clave-otp-segura'),
-    creadoEn: new Date().toISOString(),
-    correoVerificadoEn: null,
-    codigoVerificacionHash: hashCodigoVerificacion(codigo, sal, process.env.AUTH_SESSION_SECRET),
-    codigoVerificacionSal: sal,
-    codigoVerificacionVence: venceEn,
-    intentosCodigo: 0
-  };
-  fs.writeFileSync(process.env.AUTH_ACCOUNTS_FILE, JSON.stringify(cuentas));
-}
 
 test('guarda una contraseña como hash salado y solo valida la contraseña correcta', async () => {
   const guardado = await hashPassword('Contraseña-segura-123');
@@ -54,71 +36,57 @@ test('la sesión está firmada, expira y rechaza alteraciones', () => {
   assert.equal(verificarTokenSesion(token, { secreto, ahora: 8 * 24 * 60 * 60 * 1000 }), null);
 });
 
-test('SMTP ausente deja la cuenta pendiente con contraseña y OTP hasheados', async () => {
-  const variablesCorreo = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'EMAIL_FROM'];
-  const valoresPrevios = Object.fromEntries(variablesCorreo.map((nombre) => [nombre, process.env[nombre]]));
-  variablesCorreo.forEach((nombre) => delete process.env[nombre]);
-  const correo = 'cuenta-pendiente@example.invalid';
+test('crear una cuenta inicia sesión inmediatamente sin configurar correo', async () => {
+  const correo = 'cuenta-activa@example.invalid';
+  const resultado = await registrarCuenta('Cuenta de prueba', 'GolDeOro', 'Alianza Lima', true, correo, 'clave-temporal-segura');
+  const cuentas = JSON.parse(fs.readFileSync(process.env.AUTH_ACCOUNTS_FILE, 'utf8'));
 
-  try {
-    const resultado = await registrarCuenta('Cuenta de prueba', correo, 'clave-temporal-segura');
-    const cuentas = JSON.parse(fs.readFileSync(process.env.AUTH_ACCOUNTS_FILE, 'utf8'));
-
-    assert.equal(resultado.correoEnviado, false);
-    assert.match(resultado.mensaje, /pendiente de verificación/);
-    assert.equal(cuentas[correo].correoVerificadoEn, null);
-    assert.notEqual(cuentas[correo].passwordHash, 'clave-temporal-segura');
-    assert.match(cuentas[correo].codigoVerificacionHash, /^[a-f0-9]{64}$/);
-    assert.ok(cuentas[correo].codigoVerificacionSal);
-    assert.equal(cuentas[correo].intentosCodigo, 0);
-  } finally {
-    variablesCorreo.forEach((nombre) => {
-      if (valoresPrevios[nombre] === undefined) delete process.env[nombre];
-      else process.env[nombre] = valoresPrevios[nombre];
-    });
-  }
+  assert.equal(resultado.usuario.correo, correo);
+  assert.equal(resultado.usuario.apodo, 'GolDeOro');
+  assert.equal(resultado.usuario.equipoFavorito, 'Alianza Lima');
+  assert.equal(resultado.usuario.fechaUnion, cuentas[correo].creadoEn);
+  assert.equal(resultado.usuario.condicionesAceptadasEn, cuentas[correo].condicionesAceptadasEn);
+  assert.equal(resultado.usuario.versionCondiciones, '2026-10-07');
+  assert.ok(resultado.tokenSesion);
+  assert.ok(cuentas[correo].correoVerificadoEn);
+  assert.notEqual(cuentas[correo].passwordHash, 'clave-temporal-segura');
+  assert.deepEqual(obtenerUsuarioDeSesion(resultado.tokenSesion), resultado.usuario);
 });
 
-test('el OTP correcto verifica la cuenta y un código incorrecto consume un intento', async () => {
-  const correo = 'cuenta-otp@example.invalid';
-  const codigo = '042381';
-  const sal = 'sal-otp-prueba';
+test('cuentas antiguas pendientes pueden ingresar y quedan activadas tras validar su contraseña', async () => {
+  const correo = 'cuenta-pendiente@example.invalid';
   const cuentas = JSON.parse(fs.readFileSync(process.env.AUTH_ACCOUNTS_FILE, 'utf8'));
   cuentas[correo] = {
-    nombre: 'Cuenta OTP',
+    nombre: 'Cuenta antigua',
     correo,
-    passwordHash: await hashPassword('clave-otp-segura'),
+    passwordHash: await hashPassword('clave-antigua-segura'),
     creadoEn: new Date().toISOString(),
     correoVerificadoEn: null,
-    codigoVerificacionHash: hashCodigoVerificacion(codigo, sal, process.env.AUTH_SESSION_SECRET),
-    codigoVerificacionSal: sal,
-    codigoVerificacionVence: Date.now() + 10 * 60 * 1000,
+    codigoVerificacionHash: 'hash-antiguo',
+    codigoVerificacionSal: 'sal-antigua',
+    codigoVerificacionVence: Date.now() + 60_000,
     intentosCodigo: 0
   };
   fs.writeFileSync(process.env.AUTH_ACCOUNTS_FILE, JSON.stringify(cuentas));
 
-  await assert.rejects(verificarCuenta(correo, '000000'), (error) => error.codigo === 'OTP_INVALID');
-  const despuesDelError = JSON.parse(fs.readFileSync(process.env.AUTH_ACCOUNTS_FILE, 'utf8'));
-  assert.equal(despuesDelError[correo].intentosCodigo, 1);
-
-  const resultado = await verificarCuenta(correo, codigo);
-  assert.equal(resultado.usuario.correo, correo);
-  const verificada = JSON.parse(fs.readFileSync(process.env.AUTH_ACCOUNTS_FILE, 'utf8'));
-  assert.ok(verificada[correo].correoVerificadoEn);
-  assert.equal(verificada[correo].codigoVerificacionHash, undefined);
+  const sesion = await iniciarSesion(correo, 'clave-antigua-segura');
+  const guardadas = JSON.parse(fs.readFileSync(process.env.AUTH_ACCOUNTS_FILE, 'utf8'));
+  assert.equal(sesion.usuario.correo, correo);
+  assert.ok(guardadas[correo].correoVerificadoEn);
+  assert.equal(guardadas[correo].codigoVerificacionHash, undefined);
+  assert.equal(sesion.usuario.apodo, 'Cuenta antigua');
+  assert.equal(sesion.usuario.equipoFavorito, '');
+  assert.equal(sesion.usuario.condicionesAceptadasEn, null);
+  assert.deepEqual(obtenerUsuarioDeSesion(sesion.tokenSesion), sesion.usuario);
 });
 
-test('el OTP vence y se bloquea tras cinco intentos incorrectos', async () => {
-  const correoVencido = 'otp-vencido@example.invalid';
-  await guardarCuentaOtp(correoVencido, '111111', Date.now() - 1);
-  await assert.rejects(verificarCuenta(correoVencido, '111111'), (error) => error.codigo === 'OTP_EXPIRED');
-
-  const correoBloqueado = 'otp-bloqueado@example.invalid';
-  await guardarCuentaOtp(correoBloqueado, '222222', Date.now() + 10 * 60 * 1000);
-  for (let intento = 0; intento < 4; intento += 1) {
-    await assert.rejects(verificarCuenta(correoBloqueado, '000000'), (error) => error.codigo === 'OTP_INVALID');
-  }
-  await assert.rejects(verificarCuenta(correoBloqueado, '000000'), (error) => error.codigo === 'OTP_LOCKED');
-  const cuentas = JSON.parse(fs.readFileSync(process.env.AUTH_ACCOUNTS_FILE, 'utf8'));
-  assert.equal(cuentas[correoBloqueado].codigoVerificacionHash, undefined);
+test('el registro rechaza cuentas sin aceptar las condiciones o sin equipo favorito', async () => {
+  await assert.rejects(
+    registrarCuenta('Otra cuenta', 'Aficionado', 'Universitario', false, 'sin-consentimiento@example.invalid', 'clave-segura-123'),
+    (error) => error.codigo === 'TERMS_REQUIRED'
+  );
+  await assert.rejects(
+    registrarCuenta('Otra cuenta', 'Aficionado', '', true, 'sin-equipo@example.invalid', 'clave-segura-123'),
+    (error) => error.codigo === 'FAVORITE_TEAM_REQUIRED'
+  );
 });
