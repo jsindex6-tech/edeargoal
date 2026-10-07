@@ -11,6 +11,7 @@ interface Props {
 
 interface PartidoLiga {
   id?: number | string;
+  ligaId?: number | string;
   idLocal?: number | string;
   local?: string;
   logoLocal?: string;
@@ -23,6 +24,7 @@ interface PartidoLiga {
   fechaUtc?: string;
   fechaTexto?: string;
   hora?: string;
+  jornadaTexto?: string;
   estadoPartido?: string;
   estado?: string;
   proveedor?: string;
@@ -58,6 +60,8 @@ interface RespuestaLiga {
   teams?: EquipoLiga[];
   campeones?: CampeonLiga[];
   champions?: CampeonLiga[];
+  mensajeTabla?: string;
+  aviso?: string;
 }
 
 interface EquipoSeleccionado {
@@ -151,6 +155,8 @@ export default function VistaLigaDetalle({ ligaSeleccionada, onRegresarGeneral }
   const [jornadaSeleccionada, setJornadaSeleccionada] = useState<number | null>(null);
   const [cargando, setCargando] = useState(true);
   const [errorBackend, setErrorBackend] = useState<string | null>(null);
+  const [mensajeTabla, setMensajeTabla] = useState('');
+  const [avisoDatos, setAvisoDatos] = useState('');
 
   const nombreLiga = ligaSeleccionada?.nombreMostrar || 'Competición';
   const idLiga = ligaSeleccionada?.idLiga || '';
@@ -182,6 +188,8 @@ export default function VistaLigaDetalle({ ligaSeleccionada, onRegresarGeneral }
       try {
         setCargando(true);
         setErrorBackend(null);
+        setMensajeTabla('');
+        setAvisoDatos('');
 
         const params = new URLSearchParams({
           liga: String(idLiga),
@@ -206,6 +214,8 @@ export default function VistaLigaDetalle({ ligaSeleccionada, onRegresarGeneral }
         setTablaDatos(Array.isArray(tabla) ? tabla : []);
         setEquiposDatos(Array.isArray(equipos) ? equipos : []);
         setCampeonesDatos(Array.isArray(campeones) ? campeones : []);
+        setMensajeTabla(respuestaLiga.mensajeTabla || '');
+        setAvisoDatos(respuestaLiga.aviso || '');
         setEquipoSeleccionado(null);
         setPartidoSeleccionado(null);
         setJornadaSeleccionada(null);
@@ -216,6 +226,8 @@ export default function VistaLigaDetalle({ ligaSeleccionada, onRegresarGeneral }
         setTablaDatos([]);
         setEquiposDatos([]);
         setCampeonesDatos([]);
+        setMensajeTabla('');
+        setAvisoDatos('');
       } finally {
         setCargando(false);
       }
@@ -275,6 +287,7 @@ export default function VistaLigaDetalle({ ligaSeleccionada, onRegresarGeneral }
     setPartidoSeleccionado({
       ...partido,
       id: partido.id,
+      ligaId: idLiga,
       local: partido.local || 'Local',
       visitante: partido.visitante || 'Visitante'
     });
@@ -370,6 +383,11 @@ export default function VistaLigaDetalle({ ligaSeleccionada, onRegresarGeneral }
               Cargando datos de la liga...
             </div>
           )}
+          {avisoDatos && (
+            <div style={{ padding: '12px 14px', marginBottom: '12px', borderRadius: '8px', background: 'rgba(255,207,74,0.08)', border: '1px solid rgba(255,207,74,0.25)', color: '#E8D49B', fontSize: '0.8rem' }}>
+              {avisoDatos}
+            </div>
+          )}
 
           <div style={{ marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '10px', color: '#FFF', fontWeight: 800, fontSize: '0.83rem', letterSpacing: '0.07em', textTransform: 'uppercase' }}>
             Tabla de posiciones real
@@ -413,7 +431,7 @@ export default function VistaLigaDetalle({ ligaSeleccionada, onRegresarGeneral }
                     {!cargando && puntajeTabla.length === 0 && (
                       <tr>
                         <td colSpan={6} style={{ padding: '20px', textAlign: 'center', color: '#A7ADBA' }}>
-                          La API no devolvió la tabla de posiciones.
+                          {mensajeTabla || 'La API no devolvió la tabla de posiciones.'}
                         </td>
                       </tr>
                     )}
@@ -437,7 +455,7 @@ export default function VistaLigaDetalle({ ligaSeleccionada, onRegresarGeneral }
                   ‹
                 </button>
                 <span style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                  {jornadaActiva ? `Fecha ${jornadaActiva}` : 'Sin jornada'}
+                  {jornadaActiva ? partidosDeJornada[0]?.jornadaTexto || `Fecha ${jornadaActiva}` : 'Sin jornada'}
                 </span>
                 <button
                   onClick={() => indiceJornada >= 0 && indiceJornada < jornadas.length - 1 && setJornadaSeleccionada(jornadas[indiceJornada + 1])}
@@ -451,12 +469,14 @@ export default function VistaLigaDetalle({ ligaSeleccionada, onRegresarGeneral }
               <div style={{ padding: '0 10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {partidosDeJornada.map((partido, index) => {
                   const partidoFinalizado = partido.finalizado ?? Boolean(partido.marcador && partido.marcador !== 'VS');
-                  const partidoEnVivo = String(partido.estadoPartido || '').toLowerCase().includes('vivo');
+                  const estadoPartido = String(partido.estadoPartido || '').toLowerCase();
+                  const partidoEnVivo = estadoPartido.includes('vivo') || estadoPartido.includes('entretiempo');
+                  const tieneMarcador = Boolean(partido.marcador && partido.marcador !== 'VS');
                   const colorEstado = partidoEnVivo ? '#FFCF4A' : partidoFinalizado ? '#FF8FA3' : '#62E6FF';
                   return (
                     <div key={partido.id || index} onClick={() => seleccionarPartido(partido)} style={{ background: partidoEnVivo ? 'linear-gradient(135deg, #252015, #151922)' : 'linear-gradient(135deg, #111A27, #0F141D)', borderRadius: '8px', padding: '10px', border: `1px solid ${partidoEnVivo ? 'rgba(255,207,74,0.65)' : 'rgba(98,230,255,0.15)'}`, cursor: partido.id ? 'pointer' : 'default' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: colorEstado, fontWeight: 900, textTransform: 'uppercase' }}>
-                        {partidoFinalizado ? <span>{partido.estadoPartido || partido.estado || 'Finalizado'}</span> : <span>{partido.fechaTexto || partido.fechaISO || ''}</span>}
+                        {partidoFinalizado || partidoEnVivo ? <span>{partido.estadoPartido || partido.estado || 'En Vivo'}</span> : <span>{partido.fechaTexto || partido.fechaISO || ''}</span>}
                         <span>{partidoFinalizado ? partido.fechaTexto || partido.fechaISO || '' : partido.hora || ''}</span>
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', marginTop: '8px', gap: '8px' }}>
@@ -464,8 +484,9 @@ export default function VistaLigaDetalle({ ligaSeleccionada, onRegresarGeneral }
                           {partido.logoLocal && <img src={partido.logoLocal} alt="" style={{ width: '25px', height: '25px', objectFit: 'contain', flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
                           <span>{partido.local}</span>
                         </div>
-                        {partidoFinalizado && <div style={{ fontSize: '0.82rem', fontWeight: 950, color: '#D8F95B' }}>{partido.marcador}</div>}
-                        {!partidoFinalizado && <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#62E6FF' }}>VS</div>}
+                        {(partidoFinalizado || partidoEnVivo) && tieneMarcador && <div style={{ fontSize: '0.82rem', fontWeight: 950, color: '#D8F95B' }}>{partido.marcador}</div>}
+                        {!partidoFinalizado && !partidoEnVivo && <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#62E6FF' }}>VS</div>}
+                        {partidoEnVivo && !tieneMarcador && <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#FFCF4A' }}>EN VIVO</div>}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '7px', minWidth: 0, textAlign: 'right', color: '#FFF', fontSize: '0.72rem', fontWeight: 800 }}>
                           <span>{partido.visitante}</span>
                           {partido.logoVisitante && <img src={partido.logoVisitante} alt="" style={{ width: '25px', height: '25px', objectFit: 'contain', flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />}

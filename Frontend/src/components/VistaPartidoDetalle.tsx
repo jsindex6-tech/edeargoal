@@ -3,6 +3,7 @@ import { fetchApi } from '../services/api';
 
 interface PartidoDetalleSeleccionado {
   id: number | string;
+  ligaId?: number | string;
   proveedor?: string;
   liga?: string;
   jornada?: number | string;
@@ -85,7 +86,12 @@ export default function VistaPartidoDetalle({ partido, onRegresar }: Props) {
     let activo = true;
     const cargarDetalle = async () => {
       try {
-        const respuesta = await fetchApi(`/api/partidos/${partido.id}/detalle?proveedor=${encodeURIComponent(partido.proveedor || 'api-football')}&refresh=1`);
+        const parametros = new URLSearchParams({
+          proveedor: partido.proveedor || 'api-football',
+          liga: String(partido.ligaId || ''),
+          refresh: '1'
+        });
+        const respuesta = await fetchApi(`/api/partidos/${partido.id}/detalle?${parametros.toString()}`);
         const contenido = await respuesta.text();
         let data: DatosDetallePartido = {};
         try { data = contenido ? JSON.parse(contenido) as DatosDetallePartido : {}; } catch { throw new Error('El backend no devolvió JSON. Reinicia el servidor Backend.'); }
@@ -98,7 +104,7 @@ export default function VistaPartidoDetalle({ partido, onRegresar }: Props) {
     cargarDetalle();
     const intervalo = window.setInterval(cargarDetalle, 60000);
     return () => { activo = false; window.clearInterval(intervalo); };
-  }, [partido.id, partido.proveedor]);
+  }, [partido.id, partido.ligaId, partido.proveedor]);
 
   const partidoApi = datos?.partido;
   const local = partidoApi?.teams?.home?.name || partido.local;
@@ -118,7 +124,7 @@ export default function VistaPartidoDetalle({ partido, onRegresar }: Props) {
     ? new Date(datos.alineacionDisponibleDesde).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
     : '';
   const colorCamiseta = (equipo: EquipoAlineacion, index: number) => equipo.team?.colors?.player?.primary || (index === 0 ? '#2563EB' : '#F8FAFC');
-  const obtenerFotoJugador = (jugador: JugadorAlineacion) => jugador.player?.photo || (jugador.player?.id
+  const obtenerFotoJugador = (jugador: JugadorAlineacion) => jugador.player?.photo || (partido.proveedor !== 'espn' && jugador.player?.id
     ? `https://media.api-sports.io/football/players/${jugador.player.id}.png`
     : '');
   const posicionesCancha = [

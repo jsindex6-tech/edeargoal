@@ -6,6 +6,13 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const axios = require('axios');
 const { evaluarVentanaAlineacion, debeMantenerAlineacionesGuardadas } = require('./src/utils/ventanaAlineacion');
+const {
+  obtenerConfiguracionESPN,
+  obtenerTemporadaESPN,
+  obtenerDatosLigaESPN,
+  obtenerDatosEquipoESPN,
+  obtenerDetallePartidoESPN
+} = require('./src/services/espnSoccer');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -518,6 +525,46 @@ function normalizarPartidoFootballData(partido, competencia) {
   };
 }
 
+async function obtenerDatosLigaFootballData(ligaId, apiKey) {
+  const configuracion = { headers: { 'X-Auth-Token': apiKey } };
+  const [response, standingsResponse, competitionResponse] = await Promise.all([
+    axios.get(`https://api.football-data.org/v4/competitions/${ligaId}/matches`, configuracion),
+    axios.get(`https://api.football-data.org/v4/competitions/${ligaId}/standings`, configuracion),
+    axios.get(`https://api.football-data.org/v4/competitions/${ligaId}`, configuracion)
+  ]);
+  const partidos = (response.data.matches || []).map((partido) =>
+    normalizarPartidoFootballData(partido, response.data.competition)
+  );
+  const filasTabla = standingsResponse.data?.standings?.[0]?.table || [];
+  const tabla = filasTabla.map((fila) => ({
+    id: fila.team?.id,
+    proveedor: 'football-data',
+    pos: fila.position,
+    equipo: fila.team?.name || 'Equipo',
+    logo: fila.team?.crest || (fila.team?.id ? `https://crests.football-data.org/${fila.team.id}.svg` : ''),
+    pts: fila.points ?? 0,
+    j: fila.playedGames ?? 0,
+    gol: `${fila.goalsFor ?? 0}:${fila.goalsAgainst ?? 0}`,
+    dif: fila.goalDifference ?? 0
+  }));
+  const equipos = filasTabla.map((fila) => ({
+    id: fila.team?.id,
+    proveedor: 'football-data',
+    nombre: fila.team?.name || 'Equipo',
+    logo: fila.team?.crest || (fila.team?.id ? `https://crests.football-data.org/${fila.team.id}.svg` : '')
+  }));
+  const campeones = (competitionResponse.data?.seasons || [])
+    .filter((season) => season.winner?.name)
+    .sort((a, b) => Number(b.startDate?.slice(0, 4)) - Number(a.startDate?.slice(0, 4)))
+    .map((season) => ({
+      temporada: season.startDate?.slice(0, 4),
+      equipo: season.winner.name,
+      logo: season.winner.crest || ''
+    }));
+
+  return { partidos, tabla, equipos, campeones };
+}
+
 async function obtenerPartidosPorFecha(fecha, apiFootballKey, apiKeyFootballData) {
   let errorApiFootball = null;
   if (apiFootballKey) {
@@ -824,12 +871,33 @@ app.get('/api/partidos/:partidoId/alineaciones', async (req, res) => {
 app.get('/api/partidos/:partidoId/detalle', limitarSolicitudes, async (req, res) => {
   const apiKey = process.env.API_FOOTBALL_KEY;
   const apiKeyFootballData = process.env.FOOTBALL_DATA_API_KEY;
+  const detalleESPN = req.query.proveedor === 'espn';
   const detalleFootballData = req.query.proveedor === 'football-data' && apiKeyFootballData;
+  if (detalleESPN) {
+    if (!obtenerConfiguracionESPN(req.query.liga)) {
+      return res.status(422).json({ mensaje: 'ESPN no ofrece detalles para esta competición.' });
+    }
+    const claveCacheESPN = `partido-detalle-${req.params.partidoId}-espn-${req.query.liga}-v1`;
+    const cacheESPN = leerCachePartidos(claveCacheESPN);
+    if (cacheESPN) return res.json(cacheESPN);
+
+    try {
+      const datosESPN = await obtenerDetallePartidoESPN(req.query.liga, req.params.partidoId);
+      guardarDatosCache(claveCacheESPN, datosESPN);
+      return res.json(datosESPN);
+    } catch (error) {
+      console.error('Error consultando detalle del partido en ESPN:', error.response?.status || error.message);
+      return res.status(error.response?.status || 502).json({
+        mensaje: 'No se pudo cargar el detalle del partido desde ESPN.'
+      });
+    }
+  }
+
   if (!apiKey && !detalleFootballData) {
     return res.status(503).json({ mensaje: 'Configura un proveedor de partidos en el backend para abrir los detalles.' });
   }
   const claveCache = `partido-detalle-${req.params.partidoId}-${req.query.proveedor || 'api-football'}-v3`;
-  const cacheado = req.query.refresh === '1' ? null : leerCachePartidos(claveCache);
+  const cacheado = req.query.refresh === '1' && !detalleESPN ? null : leerCachePartidos(claveCache);
   if (cacheado) return res.json(cacheado);
   try {
     if (detalleFootballData) {
@@ -943,6 +1011,30 @@ app.get('/api/equipos/:equipoId', limitarSolicitudes, async (req, res) => {
   const codigoFootballData = competenciasFootballData[String(req.query.liga)];
   const apiKeyFootballData = process.env.FOOTBALL_DATA_API_KEY;
   const temporada = process.env.API_FOOTBALL_SEASON || new Date().getUTCFullYear();
+
+  if (req.query.proveedor === 'espn') {
+    const temporadaESPN = obtenerTemporadaESPN(req.query.liga);
+    if (!temporadaESPN) {
+      return res.status(422).json({
+        mensaje: 'ESPN no ofrece perfiles de clubes para esta competición.'
+      });
+    }
+
+    const claveCacheESPN = `equipo-espn-${req.query.liga}-${req.params.equipoId}-${temporadaESPN}-v1`;
+    const cacheESPN = leerCache(claveCacheESPN, DURACION_CACHE.catalogo);
+    if (cacheESPN) return res.json(cacheESPN);
+
+    try {
+      const datos = await obtenerDatosEquipoESPN(req.query.liga, req.params.equipoId, temporadaESPN);
+      guardarDatosCache(claveCacheESPN, datos);
+      return res.json(datos);
+    } catch (error) {
+      console.error('Error consultando perfil de club en ESPN:', error.response?.status || error.message);
+      return res.status(error.response?.status || 502).json({
+        mensaje: 'No se pudo cargar el perfil del club desde ESPN.'
+      });
+    }
+  }
 
   if (!apiKey || !ligaApi || req.query.proveedor === 'football-data') {
     if (!codigoFootballData || !apiKeyFootballData) {
@@ -1288,33 +1380,28 @@ app.get('/api/partidos', limitarSolicitudes, async (req, res) => {
     if (apiFootballKey) {
       try {
         const partidosApiFootball = await obtenerPartidosApiFootball(ligaIngresada, apiFootballKey);
-        if (partidosApiFootball) return res.json(partidosApiFootball);
+        if (partidosApiFootball?.partidos?.length) return res.json(partidosApiFootball);
 
         const ligaApi = await buscarLigaApiFootball(
           req.query.nombre,
           req.query.pais,
           apiFootballKey
         );
-        if (ligaApi) return res.json(await obtenerPartidosApiFootballPorId(ligaApi, apiFootballKey));
-      } catch (errorApiFootball) {
-        const limiteAlcanzado = errorApiFootball.response?.data?.errors?.rateLimit ||
-          errorApiFootball.response?.data?.rateLimit;
-        const temporadaNoDisponible = JSON.stringify(errorApiFootball.response?.data || errorApiFootball.message || '')
-          .includes('Free plans do not have access to this season');
-        const tieneFallbackActual = Boolean(competenciasFootballData[String(ligaIngresada)] && process.env.FOOTBALL_DATA_API_KEY);
-        if ((!limiteAlcanzado && !temporadaNoDisponible) || !tieneFallbackActual) {
-          throw errorApiFootball;
+        if (ligaApi) {
+          const partidosLigaApiFootball = await obtenerPartidosApiFootballPorId(ligaApi, apiFootballKey);
+          if (partidosLigaApiFootball?.partidos?.length) return res.json(partidosLigaApiFootball);
         }
+      } catch (errorApiFootball) {
+        const tieneFallbackActual = Boolean(
+          (competenciasFootballData[String(ligaIngresada)] && process.env.FOOTBALL_DATA_API_KEY) ||
+          obtenerConfiguracionESPN(ligaIngresada)
+        );
+        if (!tieneFallbackActual) throw errorApiFootball;
       }
     }
 
     const codigoFootballData = competenciasFootballData[String(ligaIngresada)];
-    if (competenciasApiFootball[String(ligaIngresada)] && !apiFootballKey && !codigoFootballData) {
-      return res.status(500).json({
-        error: "API_FOOTBALL_KEY_FALTANTE",
-        mensaje: "Süper Lig necesita API_FOOTBALL_KEY en Backend/.env porque football-data.org no ofrece esta competición."
-      });
-    }
+    const competenciaESPN = obtenerConfiguracionESPN(ligaIngresada);
 
     const apiKey = process.env.FOOTBALL_DATA_API_KEY;
 
@@ -1324,106 +1411,49 @@ app.get('/api/partidos', limitarSolicitudes, async (req, res) => {
     // toda la navegación, pero esta fuente solo ofrece algunas competencias.
     const codigoValido = codigosFootballData.has(ligaId);
 
-    if (!codigoValido) {
+    const responderESPN = async () => {
+      const temporadaESPN = obtenerTemporadaESPN(ligaIngresada);
+      const claveCacheESPN = `espn-${ligaIngresada}-${temporadaESPN}-jornadas-v1`;
+      const datoESPN = leerCachePartidos(claveCacheESPN);
+      if (datoESPN) return res.json(datoESPN);
+
+      const datos = await reutilizarSolicitud(claveCacheESPN, () => obtenerDatosLigaESPN(ligaIngresada));
+      guardarDatosCache(claveCacheESPN, datos);
+      return res.json(datos);
+    };
+
+    if (!codigoValido && !competenciaESPN) {
       return res.status(422).json({
         error: "COMPETENCIA_NO_DISPONIBLE",
-        mensaje: "Esta competencia necesita un proveedor de datos compatible.",
+        mensaje: "No hay una fuente gratuita verificada para esta competición.",
         liga: ligaIngresada
       });
     }
 
     if (!apiKey) {
+      if (competenciaESPN) return await responderESPN();
       return res.status(500).json({
         error: "API_KEY_FALTANTE",
         mensaje: "Configura FOOTBALL_DATA_API_KEY en Backend/.env"
       });
     }
 
-    const urlApi = `https://api.football-data.org/v4/competitions/${ligaId}/matches`;
+    if (!codigoValido) return await responderESPN();
+
     const claveCache = `football-data-${ligaId}-jornadas-v6`;
     const datoGuardado = leerCachePartidos(claveCache);
     if (datoGuardado) return res.json(datoGuardado);
 
-    const configuracion = {
-      headers: { 'X-Auth-Token': apiKey }
-    };
-    const [response, standingsResponse, competitionResponse] = await Promise.all([
-      axios.get(urlApi, configuracion),
-      axios.get(`https://api.football-data.org/v4/competitions/${ligaId}/standings`, configuracion),
-      axios.get(`https://api.football-data.org/v4/competitions/${ligaId}`, configuracion)
-    ]);
-
-    const matches = response.data.matches || [];
-
-    const partidosMap = matches.map((m) => {
-      let marcadorFinal = "VS";
-      const homeScore = m.score?.fullTime?.home;
-      const awayScore = m.score?.fullTime?.away;
-
-      if (homeScore !== null && homeScore !== undefined && awayScore !== null && awayScore !== undefined) {
-        marcadorFinal = `${homeScore} - ${awayScore}`;
-      }
-
-      return {
-        id: m.id,
-        idLocal: m.homeTeam?.id || null,
-        idVisitante: m.awayTeam?.id || null,
-        local: m.homeTeam?.name || "Local",
-        logoLocal: m.homeTeam?.crest || "https://crests.football-data.org/764.svg",
-        visitante: m.awayTeam?.name || "Visitante",
-        logoVisitante: m.awayTeam?.crest || "https://crests.football-data.org/764.svg",
-        marcador: marcadorFinal,
-        jornada: m.matchday || null,
-        finalizado: partidoFinalizado(m.status, homeScore, awayScore),
-        proveedor: 'football-data',
-        fechaISO: m.utcDate?.slice(0, 10),
-        fechaUtc: m.utcDate,
-        fechaTexto: formatearFechaEspanol(m.utcDate),
-        hora: formatearHora(m.utcDate),
-        estadoPartido: traducirEstado(m.status),
-        liga: response.data.competition?.name || "Competición",
-        logoLiga: response.data.competition?.emblem || "https://crests.football-data.org/CL.svg",
-        pais: response.data.area?.name || "Internacional",
-        streamUrl: "https://www.youtube.com/embed/live_stream?channel=UC4i_9WvfPRTuRWEaA6BdCTw",
-        stats: {
-          posesion: "50% - 50%",
-          remates: "0 - 0",
-          tarjetasAmarillas: "0 - 0"
-        }
-      };
-    });
-
-    const filasTabla = standingsResponse.data?.standings?.[0]?.table || [];
-    const tabla = filasTabla.map((fila) => ({
-      id: fila.team?.id,
-      proveedor: 'football-data',
-      pos: fila.position,
-      equipo: fila.team?.name || "Equipo",
-      logo: fila.team?.crest || (fila.team?.id ? `https://crests.football-data.org/${fila.team.id}.svg` : ""),
-      pts: fila.points ?? 0,
-      j: fila.playedGames ?? 0,
-      gol: `${fila.goalsFor ?? 0}:${fila.goalsAgainst ?? 0}`,
-      dif: fila.goalDifference ?? 0
-    })) || [];
-
-    const equipos = filasTabla.map((fila) => ({
-      id: fila.team?.id,
-      proveedor: 'football-data',
-      nombre: fila.team?.name || 'Equipo',
-      logo: fila.team?.crest || (fila.team?.id ? `https://crests.football-data.org/${fila.team.id}.svg` : '')
-    }));
-    const campeones = (competitionResponse.data?.seasons || [])
-      .filter((temporada) => temporada.winner?.name)
-      .sort((a, b) => Number(b.startDate?.slice(0, 4)) - Number(a.startDate?.slice(0, 4)))
-      .map((temporada) => ({
-        temporada: temporada.startDate?.slice(0, 4),
-        equipo: temporada.winner.name,
-        logo: temporada.winner.crest || ''
-      }));
-
-    const datos = { partidos: partidosMap, tabla, equipos, campeones };
-    guardarDatosCache(claveCache, datos);
-    res.json(datos);
+    try {
+      const datos = await obtenerDatosLigaFootballData(ligaId, apiKey);
+      if (!datos.partidos.length && competenciaESPN) return await responderESPN();
+      guardarDatosCache(claveCache, datos);
+      return res.json(datos);
+    } catch (errorFootballData) {
+      if (!competenciaESPN) throw errorFootballData;
+      console.warn('football-data no respondió para la competición; se intentará ESPN:', errorFootballData.response?.status || errorFootballData.message);
+      return await responderESPN();
+    }
   } catch (error) {
     console.error("Error consultando partidos:", error.response?.data || error.message);
     const proveedorIndicaLimite = error.response?.data?.errors?.rateLimit ||
