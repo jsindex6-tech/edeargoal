@@ -1,0 +1,6 @@
+node_modules/
+.env
+.cache-ligas.json
+.accounts.json
+.accounts.json.*.tmp
+.auth-session-secret

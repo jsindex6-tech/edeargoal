@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: edeargoal
+    runtime: node
+    buildCommand: npm ci --prefix Backend && npm ci --prefix Frontend && npm run build --prefix Frontend
+    startCommand: npm start --prefix Backend
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_FOOTBALL_SEASON
+        value: "2026"
+      - key: FOOTBALL_DATA_API_KEY
+        sync: false
+      - key: API_FOOTBALL_KEY
+        sync: false
+      - key: FRONTEND_ORIGIN
+        value: "https://jsindex6-tech.github.io,https://edeargoal.onrender.com"
+      - key: AUTH_SESSION_SECRET
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
