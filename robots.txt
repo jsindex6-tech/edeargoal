@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://jsindex6-tech.github.io/edeargoal/sitemap.xml
